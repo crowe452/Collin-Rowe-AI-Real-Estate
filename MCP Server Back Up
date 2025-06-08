@@ -1008,13 +1008,13 @@ ${results.slice(0, 5).join('\n\n')}
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.log('🚀 Collin\'s Complete Real Estate MCP Server v4.0 is LIVE!');
-  console.log('🔄 INTEGRATED WORKFLOW: GHL Contact Processing → Unified Analysis → Targeted Tools');
-  console.log('✅ BUCKET 2 COMPLETE: Seller Finance + Cash Wholesale + GHL Integration');
-  console.log('📊 KEY FEATURES: No guessing, flag missing data, side-by-side comparison');
-  console.log('📈 NEW: Week in Review analysis for 250+ weekly offers with error detection');
-  console.log('💪 DEPLOYMENT STATUS: Full production ready - let\'s test and iterate!');
-  console.log('🎯 Ready for BUCKET 3: Message Prioritization (Next Phase)');
+  console.log(' Collin\'s Complete Real Estate MCP Server v4.0 is LIVE!');
+  console.log(' INTEGRATED WORKFLOW: GHL Contact Processing → Unified Analysis → Targeted Tools');
+  console.log(' BUCKET 2 COMPLETE: Seller Finance + Cash Wholesale + GHL Integration');
+  console.log(' KEY FEATURES: No guessing, flag missing data, side-by-side comparison');
+  console.log(' NEW: Week in Review analysis for 250+ weekly offers with error detection');
+  console.log(' DEPLOYMENT STATUS: Full production ready - let\'s test and iterate!');
+  console.log(' Ready for BUCKET 3: Message Prioritization (Next Phase)');
 }
 
 main().catch((error) => {

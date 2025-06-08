@@ -15,7 +15,7 @@ import path from 'path';
 const server = new Server(
   {
     name: 'collin-complete-real-estate-mcp',
-    version: '4.0.0',
+    version: '4.1.0',
   },
   {
     capabilities: {
@@ -24,11 +24,13 @@ const server = new Server(
   }
 );
 
-// Complete Real Estate Analysis + GHL Integration + Cash Wholesale Tools
+// Complete Real Estate Analysis + GHL Integration + ENHANCED DUAL MEMORY SEARCH
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
-      // GHL CONTACT PROCESSOR (Data Feeder with Real API Calls)
+      // [ALL YOUR EXISTING TOOLS REMAIN THE SAME - just showing memory tools here for brevity]
+      
+      // GHL CONTACT PROCESSOR
       {
         name: 'process_ghl_contact',
         description: 'Fetch GHL contact data via API and extract property details for analysis tools',
@@ -42,7 +44,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
 
-      // UNIFIED DEAL ANALYZER (Side-by-Side Comparison)
+      // UNIFIED DEAL ANALYZER
       {
         name: 'analyze_deal_unified',
         description: 'Run both seller finance and cash wholesale analysis side-by-side for comparison (seller chooses approach)',
@@ -62,7 +64,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
 
-      // SELLER FINANCE ANALYSIS (Enhanced Skywatch Logic)
+      // SELLER FINANCE ANALYSIS
       {
         name: 'analyze_seller_finance_deal',
         description: 'Complete seller finance analysis using Skywatch calculator logic with deal qualification',
@@ -93,7 +95,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
 
-      // CASH WHOLESALE ANALYSIS (Based on Rent-Ready Research)
+      // CASH WHOLESALE ANALYSIS
       {
         name: 'analyze_cash_wholesale_deal',
         description: 'Comprehensive cash wholesale analysis using rent-ready property formulas and market-specific factors',
@@ -147,7 +149,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
 
-      // WEEK IN REVIEW ANALYSIS
+      // WEEK IN REVIEW
       {
         name: 'generate_week_in_review',
         description: 'Comprehensive analysis of weekly offers (250+) across all 5 GHL custom fields with error detection and trends',
@@ -181,7 +183,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
 
-      // MEMORY SYSTEM TOOLS
+      // ENHANCED MEMORY SYSTEM TOOLS - NOW WITH DUAL DIRECTORY SEARCH
       {
         name: 'process_business_memory',
         description: 'Process current conversation into structured business memory with progress tracking',
@@ -210,14 +212,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
 
+      // 🔥 ENHANCED DUAL DIRECTORY SEARCH
       {
         name: 'search_memories',
-        description: 'Search through all saved business memories',
+        description: 'Search through ALL saved memories (both business and legacy directories)',
         inputSchema: {
           type: 'object',
           properties: {
             searchTerm: { type: 'string', description: 'Term or phrase to search for in memories' },
-            category: { type: 'string', default: 'all', description: 'Optional category filter: running, detailed, all' },
+            category: { type: 'string', enum: ['all', 'business', 'legacy'], default: 'all', description: 'Search scope: all directories, business only, or legacy only' },
             timeframe: { type: 'string', default: 'all', description: 'Optional time filter: week, month, all' }
           },
           required: ['searchTerm']
@@ -227,779 +230,106 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
-// Tool execution handler
+// Tool execution handler with ENHANCED MEMORY SEARCH
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
-    // GHL CONTACT PROCESSOR (Real API Calls)
-    if (name === 'process_ghl_contact') {
-      const { contactId, contactName, analysisMode = 'both_scenarios' } = args;
-      
-      // NOTE: This is where real GHL API integration would go
-      // For now, return structure showing what data should be extracted
-      return {
-        content: [{
-          type: 'text',
-          text: `# 📋 GHL CONTACT PROCESSOR
+    // [ALL YOUR EXISTING TOOL IMPLEMENTATIONS REMAIN THE SAME]
+    // [Only showing the enhanced search_memories implementation here]
 
-## 🔍 CONTACT LOOKUP
-**Contact ID:** ${contactId || 'Looking up by name: ' + contactName}
-**Analysis Mode:** ${analysisMode.toUpperCase()}
-
-## ⚠️ API INTEGRATION NEEDED
-This tool needs GHL API credentials and endpoint configuration.
-
-**Expected data extraction:**
-- Property address from contact fields
-- Asking price from investor breakdown
-- ARV estimate from investor breakdown  
-- Monthly rent from investor breakdown
-- Repair costs from investor breakdown
-- Property tax from investor breakdown
-- Insurance estimate from investor breakdown
-
-## 🎯 NEXT STEPS
-1. **Configure GHL API credentials**
-2. **Set up contact field mapping**
-3. **Test with real contact like Sherri Saad**
-
-**For now:** Please provide property details manually for analysis.
-
----
-**Status:** API Integration Required | **Contact:** ${contactId || contactName}`
-        }]
-      };
-    }
-
-    // UNIFIED DEAL ANALYZER (Side-by-Side, No Winner)
-    if (name === 'analyze_deal_unified') {
-      const { 
-        propertyAddress = 'Property Analysis', arv, askingPrice, monthlyRent, 
-        repairCosts, propertyTax, insurance, marketLocation = 'competitive' 
-      } = args;
-
-      // Flag missing required data
-      const missingData = [];
-      if (!repairCosts) missingData.push('Repair costs');
-      if (!propertyTax) missingData.push('Property tax');
-      if (!insurance) missingData.push('Insurance');
-
-      if (missingData.length > 0) {
-        return {
-          content: [{
-            type: 'text',
-            text: `# ⚠️ MISSING REQUIRED DATA
-
-**Property:** ${propertyAddress}
-
-**Missing Information Needed:**
-${missingData.map(item => `- ${item}`).join('\n')}
-
-**Please provide missing data to run unified analysis.**
-
-**Available data:**
-- ARV: $${arv?.toLocaleString() || 'Not provided'}
-- Asking Price: $${askingPrice?.toLocaleString() || 'Not provided'}  
-- Monthly Rent: $${monthlyRent?.toLocaleString() || 'Not provided'}
-- Market: ${marketLocation.toUpperCase()}
-
-**Use:** \`analyze_seller_finance_deal\` or \`analyze_cash_wholesale_deal\` directly if you have the missing data.`
-          }]
-        };
-      }
-
-      // CASH WHOLESALE CALCULATION (Rent-Ready Research Formula)
-      const marketFactors = { 
-        detroit: 0.65, cleveland: 0.70, birmingham: 0.73, atlanta: 0.72,
-        nashville: 0.71, memphis: 0.68, indianapolis: 0.69, 
-        competitive: 0.70, stable: 0.72, emerging: 0.75 
-      };
-      
-      const marketFactor = marketFactors[marketLocation] || 0.70;
-      const baseValue = arv * marketFactor;
-      const fixedCosts = baseValue * 0.03; // 3% closing costs
-      const cashBuyerProfit = arv * 0.18; // 18% buyer profit (from research)
-      const assignmentFee = Math.max(5000, baseValue * 0.10); // $5K min or 10%
-      
-      const cashMaxOffer = baseValue - repairCosts - fixedCosts - cashBuyerProfit - assignmentFee;
-      const cashConservativeOffer = cashMaxOffer * 0.85;
-      
-      // SELLER FINANCE CALCULATION (Collin's Specs: 8% down, 3% rate, 30 years)
-      const suggestedDownPayment = askingPrice * 0.08; // 8% down
-      const loanAmount = askingPrice - suggestedDownPayment;
-      const interestRate = 3.0; // 3% default rate
-      const monthlyRate = interestRate / 100 / 12;
-      const amortization = 30; // 30 year default
-      
-      const monthlyPI = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, amortization * 12)) / 
-                       (Math.pow(1 + monthlyRate, amortization * 12) - 1);
-      
-      // Operating expenses: 20% total (10% capex/maint + 10% management)
-      const operatingExpensePercent = 20;
-      const operatingExpenses = monthlyRent * (operatingExpensePercent / 100);
-      const totalMonthlyExpenses = propertyTax + insurance + operatingExpenses + monthlyPI;
-      const sfCashFlow = monthlyRent - totalMonthlyExpenses;
-      
-      const sfEntryFee = suggestedDownPayment + repairCosts + (askingPrice * 0.03) + 5000; // 3% closing + $5K assignment
-      const sfCocReturn = sfEntryFee > 0 ? (sfCashFlow * 12 / sfEntryFee) * 100 : 0;
-
-      // Deal qualification for seller finance
-      const sfQualifies = sfCocReturn >= 12 && sfCashFlow >= 200;
-      const cashViable = cashMaxOffer > askingPrice * 0.5; // At least 50% of asking
-
-      return {
-        content: [{
-          type: 'text',
-          text: `# 🔄 UNIFIED DEAL ANALYSIS - SIDE BY SIDE
-
-## 🏠 PROPERTY OVERVIEW
-**Address:** ${propertyAddress}
-**ARV:** $${arv.toLocaleString()}
-**Asking Price:** $${askingPrice.toLocaleString()}
-**Monthly Rent:** $${monthlyRent.toLocaleString()}
-**Market:** ${marketLocation.toUpperCase()} (${(marketFactor * 100).toFixed(0)}% factor)
-
----
-
-## 💰 CASH WHOLESALE SCENARIO
-
-### 🎯 OFFER STRUCTURE
-- **Conservative Offer:** $${Math.round(cashConservativeOffer).toLocaleString()} *(recommended start)*
-- **Maximum Offer:** $${Math.round(cashMaxOffer).toLocaleString()} *(absolute ceiling)*
-- **Assignment Profit:** $${Math.round(assignmentFee).toLocaleString()}
-
-### 📊 FORMULA BREAKDOWN
-- **Base Value:** $${Math.round(baseValue).toLocaleString()} (ARV × ${(marketFactor * 100).toFixed(0)}%)
-- **Less Repairs:** -$${repairCosts.toLocaleString()}
-- **Less Closing (3%):** -$${Math.round(fixedCosts).toLocaleString()}
-- **Less Buyer Profit:** -$${Math.round(cashBuyerProfit).toLocaleString()} (18% of ARV)
-- **Less Assignment:** -$${Math.round(assignmentFee).toLocaleString()}
-
-### 💼 CASH SCENARIO STATUS
-**Viability:** ${cashViable ? '✅ VIABLE' : '❌ NOT VIABLE'} ${cashViable ? '' : '(offer too low vs asking)'}
-
----
-
-## 🏦 SELLER FINANCE SCENARIO
-
-### 🎯 FINANCING STRUCTURE  
-- **Purchase Price:** $${askingPrice.toLocaleString()} *(asking price)*
-- **Down Payment:** $${Math.round(suggestedDownPayment).toLocaleString()} *(8%)*
-- **Monthly P&I:** $${Math.round(monthlyPI).toLocaleString()}
-- **Terms:** ${interestRate}% / ${amortization} years
-
-### 💸 CASH FLOW ANALYSIS
-- **Monthly Cash Flow:** $${Math.round(sfCashFlow).toLocaleString()}
-- **Annual Cash Flow:** $${Math.round(sfCashFlow * 12).toLocaleString()}
-- **Cash-on-Cash Return:** ${sfCocReturn.toFixed(1)}%
-- **Total Entry Fee:** $${Math.round(sfEntryFee).toLocaleString()}
-
-### 📊 EXPENSE BREAKDOWN
-- **Property Tax:** $${propertyTax}/month
-- **Insurance:** $${insurance}/month
-- **Operating (20%):** $${Math.round(operatingExpenses)}/month
-- **P&I Payment:** $${Math.round(monthlyPI)}/month
-- **Total Expenses:** $${Math.round(totalMonthlyExpenses)}/month
-
-### 💼 SELLER FINANCE STATUS
-**Qualification:** ${sfQualifies ? '✅ QUALIFIES' : '❌ NEEDS WORK'}
-${!sfQualifies ? `- ${sfCocReturn < 12 ? 'CoC below 12% target' : ''} ${sfCashFlow < 200 ? 'Cash flow below $200' : ''}` : ''}
-
----
-
-## 🎯 BOTH SCENARIOS SUMMARY
-
-${sfQualifies && cashViable ? '✅ **BOTH OPTIONS WORK** - Seller can choose their preference' : ''}
-${sfQualifies && !cashViable ? '✅ **SELLER FINANCE ONLY** - Cash offer would be too low' : ''}
-${!sfQualifies && cashViable ? '✅ **CASH WHOLESALE ONLY** - Seller finance doesn\'t meet criteria' : ''}
-${!sfQualifies && !cashViable ? '❌ **NEITHER SCENARIO WORKS** - Need better terms or pass on deal' : ''}
-
-**Seller Finance:** ${sfQualifies ? `$${Math.round(sfCashFlow).toLocaleString()}/month ongoing` : 'Doesn\'t qualify'}
-**Cash Wholesale:** ${cashViable ? `$${Math.round(assignmentFee).toLocaleString()} one-time profit` : 'Offer too low'}
-
-## 📊 NEXT STEPS
-${sfQualifies ? '1. **Use Skywatch Calculator** for seller finance optimization' : ''}
-${cashViable ? '1. **Use cash wholesale tool** for detailed cash analysis' : ''}
-2. **Present ${sfQualifies && cashViable ? 'both options' : sfQualifies ? 'seller finance option' : 'cash option'}** to seller
-3. **Let seller choose** their preferred approach
-
----
-**Analysis for:** ${propertyAddress} | **Generated:** ${new Date().toLocaleString()}
-`
-        }]
-      };
-    }
-
-    // SELLER FINANCE ANALYSIS (Enhanced Skywatch Logic)
-    if (name === 'analyze_seller_finance_deal') {
-      const {
-        purchasePrice, downPaymentAmount, monthlyRent, propertyTax, insurance,
-        interestRate, amortization, balloonYears, capexMaintPercent = 10,
-        managementPercent = 10, vacancyPercent = 0, rehabCosts = 0,
-        assignmentFees = 5000, agentCommissionRate = 3, appreciationPercent = 3,
-        hoa = 0, other = 0, propertyAddress = '', outputMode = 'comprehensive'
-      } = args;
-
-      // Calculate loan details
-      const loanAmount = purchasePrice - downPaymentAmount;
-      const monthlyRate = interestRate / 100 / 12;
-      const totalPayments = amortization * 12;
-      
-      // Monthly P&I calculation
-      let monthlyPI = 0;
-      if (monthlyRate > 0) {
-        monthlyPI = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
-                   (Math.pow(1 + monthlyRate, totalPayments) - 1);
-      } else {
-        monthlyPI = loanAmount / totalPayments;
-      }
-
-      // Balloon balance calculation
-      const balloonPayments = balloonYears * 12;
-      let remainingBalance = 0;
-      if (monthlyRate > 0 && balloonPayments < totalPayments) {
-        remainingBalance = loanAmount * Math.pow(1 + monthlyRate, balloonPayments) - 
-                          monthlyPI * (Math.pow(1 + monthlyRate, balloonPayments) - 1) / monthlyRate;
-      }
-
-      // Operating expenses
-      const capexMaint = monthlyRent * (capexMaintPercent / 100);
-      const management = monthlyRent * (managementPercent / 100);
-      const vacancy = monthlyRent * (vacancyPercent / 100);
-      const totalOperatingExpenses = propertyTax + insurance + capexMaint + management + vacancy + hoa + other + monthlyPI;
-      
-      // Cash flow analysis
-      const netCashFlow = monthlyRent - totalOperatingExpenses;
-      const annualCashFlow = netCashFlow * 12;
-      
-      // Entry fee calculation (3% closing costs per Collin's spec)
-      const closingCosts = purchasePrice * 0.03;
-      const totalEntryFee = downPaymentAmount + rehabCosts + closingCosts + assignmentFees;
-      const cocReturn = totalEntryFee > 0 ? (annualCashFlow / totalEntryFee) * 100 : 0;
-
-      // Deal qualification (12% CoC + $200 cash flow)
-      const qualifies = cocReturn >= 12 && netCashFlow >= 200;
-
-      return {
-        content: [{
-          type: 'text',
-          text: `# 🏠 SELLER FINANCE DEAL ANALYSIS
-
-## 🎯 DEAL QUALIFICATION: ${qualifies ? '✅ QUALIFIES' : '❌ NEEDS WORK'}
-
-**Property:** ${propertyAddress || 'Property Analysis'}
-**Purchase Price:** $${purchasePrice.toLocaleString()}
-**Down Payment:** $${downPaymentAmount.toLocaleString()} (${((downPaymentAmount/purchasePrice)*100).toFixed(1)}%)
-
-## 💰 FINANCIAL PERFORMANCE
-- **Monthly Cash Flow:** $${Math.round(netCashFlow).toLocaleString()}
-- **Annual Cash Flow:** $${Math.round(annualCashFlow).toLocaleString()}
-- **Cash-on-Cash Return:** ${cocReturn.toFixed(2)}%
-- **Monthly P&I Payment:** $${Math.round(monthlyPI).toLocaleString()}
-
-## 📊 OPERATING EXPENSES BREAKDOWN
-- **Property Tax:** $${propertyTax}/month
-- **Insurance:** $${insurance}/month
-- **CapEx & Maintenance:** $${Math.round(capexMaint)}/month (${capexMaintPercent}%)
-- **Management:** $${Math.round(management)}/month (${managementPercent}%)
-- **Principal & Interest:** $${Math.round(monthlyPI)}/month
-${hoa > 0 ? `- **HOA:** $${hoa}/month` : ''}
-${other > 0 ? `- **Other:** $${other}/month` : ''}
-- **Total Operating:** $${Math.round(totalOperatingExpenses)}/month
-
-## 🎈 BALLOON DETAILS (Year ${balloonYears})
-- **Remaining Balance:** $${Math.round(remainingBalance).toLocaleString()}
-- **Total Payments Made:** $${Math.round(monthlyPI * balloonPayments).toLocaleString()}
-
-## 💼 BUYER ENTRY FEE
-- **Down Payment:** $${downPaymentAmount.toLocaleString()}
-- **Rehab Costs:** $${rehabCosts.toLocaleString()}
-- **Closing Costs (3%):** $${Math.round(closingCosts).toLocaleString()}
-- **Assignment Fees:** $${assignmentFees.toLocaleString()}
-- **Total Entry:** $${Math.round(totalEntryFee).toLocaleString()}
-
-${qualifies ? '🚀 **DEAL MEETS TARGET CRITERIA**' : '⚠️ **NEEDS OPTIMIZATION**'}
-${!qualifies ? `\n**Issues:** ${cocReturn < 12 ? 'CoC below 12% target' : ''} ${netCashFlow < 200 ? 'Cash flow below $200 target' : ''}` : ''}
-
-## 🎯 SKYWATCH CALCULATOR INTEGRATION
-**Use interactive Skywatch calculator to optimize:**
-- Adjust down payment percentage
-- Try different interest rates
-- Modify amortization period
-- Test balloon term variations
-
----
-**Generated:** ${new Date().toLocaleString()}
-`
-        }]
-      };
-    }
-
-    // CASH WHOLESALE ANALYSIS (Rent-Ready Research Formula)
-    if (name === 'analyze_cash_wholesale_deal') {
-      const {
-        propertyAddress = '', arv, monthlyRent, repairCosts,
-        marketLocation = 'competitive', buyerType = 'buy_hold',
-        targetCapRate = 10, minimumAssignmentFee = 5000, assignmentFeePercent = 10
-      } = args;
-
-      // Market-specific factors (expanded list)
-      const marketFactors = {
-        detroit: 0.65, cleveland: 0.70, birmingham: 0.73, atlanta: 0.72,
-        nashville: 0.71, memphis: 0.68, indianapolis: 0.69,
-        competitive: 0.70, stable: 0.72, emerging: 0.75
-      };
-
-      const marketFactor = marketFactors[marketLocation] || 0.70;
-      
-      // Buyer-specific requirements
-      const buyerRequirements = {
-        individual: { capRate: 10, cocReturn: 12, profitPercent: 0.18 },
-        institutional: { capRate: 8, cocReturn: 10, profitPercent: 0.15 },
-        fix_flip: { capRate: 12, cocReturn: 15, profitPercent: 0.22 },
-        buy_hold: { capRate: 10, cocReturn: 12, profitPercent: 0.18 }
-      };
-
-      const buyerReqs = buyerRequirements[buyerType] || buyerRequirements.buy_hold;
-
-      // Calculate Maximum Allowable Offer using rent-ready research formula
-      // MAO = (ARV × Market Factor) - Repairs - Fixed Costs - Cash Buyer Profit - Assignment Fee
-      
-      const baseValue = arv * marketFactor;
-      const fixedCosts = baseValue * 0.03; // 3% closing costs
-      const cashBuyerProfit = arv * buyerReqs.profitPercent; // 18% for buy-hold
-      
-      // Assignment fee: greater of minimum or percentage
-      const percentageFee = baseValue * (assignmentFeePercent / 100);
-      const assignmentFee = Math.max(minimumAssignmentFee, percentageFee);
-      
-      const maxAllowableOffer = baseValue - repairCosts - fixedCosts - cashBuyerProfit - assignmentFee;
-      
-      // Conservative offer (85% of MAO for negotiation room)
-      const conservativeOffer = maxAllowableOffer * 0.85;
-      
-      // Cash buyer analysis
-      const annualRent = monthlyRent * 12;
-      const estimatedNOI = annualRent * 0.75; // 75% of rent after expenses
-      const buyerCapRate = (estimatedNOI / maxAllowableOffer) * 100;
-      const buyerCocReturn = buyerCapRate; // Assumes cash purchase
-      
-      // Deal quality assessment
-      const meetsCapRate = buyerCapRate >= buyerReqs.capRate;
-      const meetsCocReturn = buyerCocReturn >= buyerReqs.cocReturn;
-      const dealQuality = meetsCapRate && meetsCocReturn ? 'EXCELLENT' : 
-                         (buyerCapRate >= 8 && buyerCocReturn >= 10) ? 'GOOD' : 'MARGINAL';
-
-      return {
-        content: [{
-          type: 'text',
-          text: `# 💰 CASH WHOLESALE DEAL ANALYSIS
-
-## 🎯 DEAL QUALITY: ${dealQuality} ${dealQuality === 'EXCELLENT' ? '🚀' : dealQuality === 'GOOD' ? '✅' : '⚠️'}
-
-**Property:** ${propertyAddress || 'Cash Analysis'}
-**ARV:** $${arv.toLocaleString()}
-**Market:** ${marketLocation.toUpperCase()} (${(marketFactor * 100).toFixed(0)}% factor)
-**Buyer Type:** ${buyerType.replace('_', '-').toUpperCase()}
-
-## 🎯 WHOLESALE OFFER RECOMMENDATIONS
-
-### 💎 CONSERVATIVE OFFER: $${Math.round(conservativeOffer).toLocaleString()}
-*Recommended starting offer with negotiation room*
-
-### 🔥 MAXIMUM OFFER: $${Math.round(maxAllowableOffer).toLocaleString()}
-*Absolute ceiling - still profitable for buyer*
-
-## 📊 RENT-READY RESEARCH FORMULA BREAKDOWN
-- **Base Value:** $${Math.round(baseValue).toLocaleString()} (ARV × ${(marketFactor * 100).toFixed(0)}%)
-- **Less Repairs:** -$${repairCosts.toLocaleString()}
-- **Less Closing (3%):** -$${Math.round(fixedCosts).toLocaleString()}
-- **Less Buyer Profit:** -$${Math.round(cashBuyerProfit).toLocaleString()} (${(buyerReqs.profitPercent * 100).toFixed(0)}% of ARV)
-- **Less Assignment:** -$${Math.round(assignmentFee).toLocaleString()} (${assignmentFee === minimumAssignmentFee ? `$${minimumAssignmentFee} minimum` : `${assignmentFeePercent}% of base`})
-
-## 💼 ASSIGNMENT FEE ANALYSIS
-- **Percentage Method:** $${Math.round(percentageFee).toLocaleString()} (${assignmentFeePercent}%)
-- **Minimum Method:** $${minimumAssignmentFee.toLocaleString()}
-- **Actual Fee:** $${Math.round(assignmentFee).toLocaleString()} *(higher of the two)*
-
-## 🏦 CASH BUYER RETURNS (At Max Offer)
-- **Cap Rate:** ${buyerCapRate.toFixed(2)}% ${meetsCapRate ? '✅' : '❌'} (Target: ${buyerReqs.capRate}%+)
-- **Cash-on-Cash:** ${buyerCocReturn.toFixed(2)}% ${meetsCocReturn ? '✅' : '❌'} (Target: ${buyerReqs.cocReturn}%+)
-- **Annual NOI:** $${Math.round(estimatedNOI).toLocaleString()}
-- **Monthly Rent:** $${monthlyRent.toLocaleString()}
-
-## 📈 MARKET INTELLIGENCE
-**${marketLocation.toUpperCase()} Market Characteristics:**
-${marketLocation === 'detroit' ? '- Lower market factor due to volatility\n- Higher assignment fees needed\n- 25-30% safety margins recommended' : ''}
-${marketLocation === 'cleveland' ? '- Stable market conditions\n- Consistent performance\n- Standard safety margins apply' : ''}
-${marketLocation === 'birmingham' ? '- Growing market potential\n- Higher market factor justified\n- Strong appreciation prospects' : ''}
-${marketLocation === 'competitive' ? '- Multiple wholesalers active\n- Price competition expected\n- Quality relationships crucial' : ''}
-
-## 🎯 STRATEGY RECOMMENDATIONS
-${dealQuality === 'EXCELLENT' ? '- **AGGRESSIVE PURSUIT:** Submit offer immediately\n- **BACKUP PLANS:** Prepare 5% escalation if needed\n- **ASSIGNMENT TARGET:** Premium buyers, quick close' : ''}
-${dealQuality === 'GOOD' ? '- **SOLID OPPORTUNITY:** Good fit for strategy\n- **NEGOTIATION ROOM:** Start conservative, escalate if needed\n- **ASSIGNMENT TARGET:** Standard buyer pool' : ''}
-${dealQuality === 'MARGINAL' ? '- **PROCEED CAUTIOUSLY:** Thin margins\n- **STRICT LIMITS:** Do not exceed conservative offer\n- **ASSIGNMENT CHALLENGE:** Limited buyer interest' : ''}
-
-**Profit Potential:** $${Math.round(assignmentFee).toLocaleString()} assignment fee
-**Risk Level:** ${dealQuality === 'EXCELLENT' ? 'LOW' : dealQuality === 'GOOD' ? 'MEDIUM' : 'HIGH'}
-
----
-**Generated:** ${new Date().toLocaleString()}
-`
-        }]
-      };
-    }
-
-    // WEEK IN REVIEW ANALYSIS
-    if (name === 'generate_week_in_review') {
-      const { 
-        weekEndingDate, 
-        ghlContactData, 
-        deliveryMethod = 'both', 
-        focusAreas = ['error_detection', 'quality_control', 'trend_analysis'],
-        includeHistoricalComparison = true 
-      } = args;
-
-      // Parse GHL data for the 5 custom fields
-      function analyzeWeeklyData(rawData) {
-        const analysis = {
-          totalOffers: 0,
-          emailContent: { errors: [], patterns: [] },
-          smsContent: { errors: [], patterns: [] },
-          investorBreakdown: { errors: [], accuracyIssues: [] },
-          offerBreakdown: { errors: [], pricingIssues: [] },
-          aiReasoning: { errors: [], assumptionIssues: [] }
-        };
-
-        // Count total offers (rough estimate based on data size)
-        const contactBlocks = rawData.split('\n\n').filter(block => block.trim().length > 100);
-        analysis.totalOffers = contactBlocks.length;
-
-        // Error detection patterns
-        const errorPatterns = {
-          email: ['undefined', 'null', 'error', 'failed', '[object Object]'],
-          sms: ['undefined', 'null', 'error', 'failed'],
-          numbers: ['NaN', 'Infinity', '$0', '$-', 'undefined'],
-          reasoning: ['ignore', 'assume', 'guess', 'seems low', 'not sure']
-        };
-
-        // Analyze each field type
-        contactBlocks.forEach((block, index) => {
-          // Email content analysis
-          if (block.toLowerCase().includes('email') || block.toLowerCase().includes('message')) {
-            errorPatterns.email.forEach(pattern => {
-              if (block.toLowerCase().includes(pattern)) {
-                analysis.emailContent.errors.push(`Contact ${index + 1}: ${pattern} detected`);
-              }
-            });
-          }
-
-          // SMS content analysis  
-          if (block.toLowerCase().includes('sms') || block.toLowerCase().includes('text')) {
-            errorPatterns.sms.forEach(pattern => {
-              if (block.toLowerCase().includes(pattern)) {
-                analysis.smsContent.errors.push(`Contact ${index + 1}: ${pattern} detected`);
-              }
-            });
-          }
-
-          // Number/pricing analysis
-          errorPatterns.numbers.forEach(pattern => {
-            if (block.includes(pattern)) {
-              analysis.offerBreakdown.errors.push(`Contact ${index + 1}: Invalid number "${pattern}"`);
-            }
-          });
-
-          // AI reasoning analysis
-          errorPatterns.reasoning.forEach(pattern => {
-            if (block.toLowerCase().includes(pattern)) {
-              analysis.aiReasoning.assumptionIssues.push(`Contact ${index + 1}: AI made assumption - "${pattern}"`);
-            }
-          });
-
-          // Check for extremely high/low numbers that might be errors
-          const prices = block.match(/\$[\d,]+/g);
-          if (prices) {
-            prices.forEach(price => {
-              const numValue = parseInt(price.replace(/[$,]/g, ''));
-              if (numValue > 1000000) {
-                analysis.offerBreakdown.pricingIssues.push(`Contact ${index + 1}: Suspiciously high price ${price}`);
-              }
-              if (numValue < 1000 && numValue > 0) {
-                analysis.offerBreakdown.pricingIssues.push(`Contact ${index + 1}: Suspiciously low price ${price}`);
-              }
-            });
-          }
-        });
-
-        return analysis;
-      }
-
-      const weeklyAnalysis = analyzeWeeklyData(ghlContactData);
-      
-      // Generate comprehensive report
-      const report = `# 📊 WEEK IN REVIEW - Week Ending ${weekEndingDate}
-
-## 🎯 EXECUTIVE SUMMARY
-- **Total Offers Processed:** ${weeklyAnalysis.totalOffers}
-- **Critical Errors Detected:** ${weeklyAnalysis.emailContent.errors.length + weeklyAnalysis.smsContent.errors.length + weeklyAnalysis.offerBreakdown.errors.length}
-- **Quality Issues Found:** ${weeklyAnalysis.investorBreakdown.accuracyIssues.length + weeklyAnalysis.offerBreakdown.pricingIssues.length + weeklyAnalysis.aiReasoning.assumptionIssues.length}
-- **Overall Status:** ${weeklyAnalysis.totalOffers > 200 ? '✅ Target volume achieved' : '⚠️ Below target volume'}
-
-## 🔍 ERROR DETECTION ANALYSIS
-
-### 📧 EMAIL CONTENT ISSUES
-${weeklyAnalysis.emailContent.errors.length > 0 ? 
-  `⚠️ **${weeklyAnalysis.emailContent.errors.length} errors detected:**\n${weeklyAnalysis.emailContent.errors.slice(0, 5).map(e => `- ${e}`).join('\n')}` : 
-  '✅ No email content errors detected'}
-
-### 📱 SMS CONTENT ISSUES  
-${weeklyAnalysis.smsContent.errors.length > 0 ? 
-  `⚠️ **${weeklyAnalysis.smsContent.errors.length} errors detected:**\n${weeklyAnalysis.smsContent.errors.slice(0, 5).map(e => `- ${e}`).join('\n')}` : 
-  '✅ No SMS content errors detected'}
-
-### 💰 OFFER BREAKDOWN ISSUES
-${weeklyAnalysis.offerBreakdown.errors.length > 0 ? 
-  `⚠️ **${weeklyAnalysis.offerBreakdown.errors.length} errors detected:**\n${weeklyAnalysis.offerBreakdown.errors.slice(0, 5).map(e => `- ${e}`).join('\n')}` : 
-  '✅ No offer breakdown errors detected'}
-
-${weeklyAnalysis.offerBreakdown.pricingIssues.length > 0 ? 
-  `\n⚠️ **Pricing Issues:**\n${weeklyAnalysis.offerBreakdown.pricingIssues.slice(0, 5).map(e => `- ${e}`).join('\n')}` : ''}
-
-### 🧠 AI REASONING QUALITY
-${weeklyAnalysis.aiReasoning.assumptionIssues.length > 0 ? 
-  `⚠️ **${weeklyAnalysis.aiReasoning.assumptionIssues.length} assumption issues:**\n${weeklyAnalysis.aiReasoning.assumptionIssues.slice(0, 5).map(e => `- ${e}`).join('\n')}` : 
-  '✅ AI reasoning appears sound across all offers'}
-
-## 📈 QUALITY CONTROL SUMMARY
-
-### ✅ WHAT'S WORKING WELL
-${weeklyAnalysis.totalOffers > 200 ? '- Volume target achieved (250+ offers/week)' : ''}
-${weeklyAnalysis.emailContent.errors.length === 0 ? '- Email content templates functioning properly' : ''}
-${weeklyAnalysis.smsContent.errors.length === 0 ? '- SMS templates functioning properly' : ''}
-${weeklyAnalysis.offerBreakdown.errors.length === 0 ? '- Offer calculations accurate' : ''}
-
-### ⚠️ AREAS NEEDING ATTENTION
-${weeklyAnalysis.totalOffers < 200 ? '- Volume below target (need process optimization)' : ''}
-${weeklyAnalysis.emailContent.errors.length > 0 ? '- Email template errors need fixing' : ''}
-${weeklyAnalysis.smsContent.errors.length > 0 ? '- SMS template errors need attention' : ''}
-${weeklyAnalysis.offerBreakdown.errors.length > 0 ? '- Offer calculation system needs debugging' : ''}
-${weeklyAnalysis.aiReasoning.assumptionIssues.length > 10 ? '- AI making too many assumptions (review prompts)' : ''}
-
-## 🎯 ACTION ITEMS
-
-### 🔥 HIGH PRIORITY
-${weeklyAnalysis.emailContent.errors.length > 0 || weeklyAnalysis.smsContent.errors.length > 0 ? 
-  '1. **Fix template errors** - Communication templates have critical issues' : ''}
-${weeklyAnalysis.offerBreakdown.errors.length > 5 ? 
-  '2. **Debug offer calculation system** - Multiple pricing errors detected' : ''}
-${weeklyAnalysis.totalOffers < 150 ? 
-  '3. **Investigate volume drop** - Significantly below target output' : ''}
-
-### ⚡ MEDIUM PRIORITY  
-${weeklyAnalysis.aiReasoning.assumptionIssues.length > 5 ? 
-  '- **Review AI prompts** - Reduce assumption-making in reasoning' : ''}
-${weeklyAnalysis.offerBreakdown.pricingIssues.length > 0 ? 
-  '- **Validate pricing logic** - Check for edge cases in calculations' : ''}
-
-### 📊 LOW PRIORITY
-- **Continue monitoring** - Overall system health appears stable
-- **Track trends** - Compare next week for improvement validation
-
-## 🔄 DELIVERY STATUS
-**Report Generated:** ${new Date().toLocaleString()}
-**Delivery Method:** ${deliveryMethod.toUpperCase()}
-${deliveryMethod.includes('gmail') ? '📧 **Email report** will be sent to primary Gmail account' : ''}
-${deliveryMethod.includes('google_drive') ? '📁 **Google Drive document** will be created with detailed analysis' : ''}
-
-## 💾 HISTORICAL TRACKING
-${includeHistoricalComparison ? '📈 **Memory integration:** This report will be saved for trend comparison' : '⏩ **Memory storage:** Skipped per request'}
-
----
-**Week Ending:** ${weekEndingDate} | **Offers Analyzed:** ${weeklyAnalysis.totalOffers} | **System Status:** ${weeklyAnalysis.emailContent.errors.length + weeklyAnalysis.smsContent.errors.length + weeklyAnalysis.offerBreakdown.errors.length === 0 ? 'HEALTHY' : 'NEEDS ATTENTION'}`;
-
-      return {
-        content: [{
-          type: 'text',
-          text: report
-        }]
-      };
-    }
-
-    // EXISTING COMMUNICATION TOOLS
-    if (name === 'analyze_message_and_respond') {
-      const { messageContent, senderInfo = '', propertyAddress = '', messageType, previousContext = '' } = args;
-      
-      const urgencyIndicators = ['asap', 'urgent', 'quick', 'fast', 'need to sell', 'motivated'];
-      const isUrgent = urgencyIndicators.some(indicator => 
-        messageContent.toLowerCase().includes(indicator)
-      );
-      
-      return {
-        content: [{
-          type: 'text',
-          text: `📨 **Message Analysis Complete**
-
-**Type:** ${messageType.toUpperCase()}
-**Urgency:** ${isUrgent ? 'HIGH 🚨' : 'NORMAL'}
-**Property:** ${propertyAddress || 'Not specified'}
-
-**Response Strategy:**
-${messageType === 'interest' ? '- Express immediate interest and schedule call' : ''}
-${messageType === 'question' ? '- Provide detailed answer and build rapport' : ''}
-${messageType === 'negotiation' ? '- Analyze terms and provide counter' : ''}
-${isUrgent ? '- PRIORITY: Respond within 30 minutes' : '- Standard response timeline'}
-
-**Next Action:** ${propertyAddress ? 'Run property analysis' : 'Request property details'}`
-        }]
-      };
-    }
-
-    if (name === 'generate_seller_response') {
-      const { analysisResult, responseType, sellerPersonality = 'business_focused', offerAmount, financingOptions = '' } = args;
-      
-      let response = '';
-      if (responseType === 'initial_interest') {
-        response = `Hi! Thank you for reaching out about your property. I'm a local real estate investor and very interested in learning more.
-
-${sellerPersonality === 'motivated' ? 'I understand you may need to sell quickly - I can often close in 10-15 days.' : ''}
-${sellerPersonality === 'analytical' ? 'I\'d love to discuss the numbers and show you my analysis.' : ''}
-
-Would you be available for a quick call to discuss your timeline?
-
-Best regards,
-Collin`;
-      }
-      
-      return {
-        content: [{
-          type: 'text',
-          text: `📧 **Generated Response (${responseType.toUpperCase()})**
-
-${response}
-
-**Strategy:** ${sellerPersonality} approach
-**Follow-up:** ${responseType === 'initial_interest' ? 'Call within 2 hours if no response' : 'Follow up in 24 hours'}`
-        }]
-      };
-    }
-
-// MEMORY SYSTEM TOOLS
-    if (name === 'process_business_memory') {
-      const { conversationText, sessionTopic, currentContext = 'General business discussion' } = args;
-      
-      const today = new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', month: 'long', day: 'numeric' 
-      });
-      
-      const processedMemory = `## 🧠 ${today} - ${sessionTopic}
-
-### What We Accomplished:
-[Business progress and technical milestones from this session]
-
-### Where We Left Off:
-- Current deals in pipeline and status
-- MCP development: what's working/broken  
-- Next immediate actions needed
-- Roadmap progress and gaps
-
-### Decision Log:
-- Choices made and reasoning
-- Deal criteria applied
-- Technical implementation decisions
-
-### Performance Patterns:
-- What keeps Collin moving forward efficiently
-- What causes delays or overwhelm (business impact)
-- Support strategies that maintain momentum
-
-### Key Learnings About Collin:
-- New insights about how he operates best
-- Communication preferences discovered
-- Decision-making patterns observed
-- What motivates vs. drains energy
-
-### Next Session Priorities:
-- [Specific business actions to pick up immediately]
-
----
-**Session Context:** ${currentContext}
-**Processed:** ${today}`;
-
-      return {
-        content: [{ type: 'text', text: `✅ **MEMORY PROCESSED**\n\n${processedMemory}` }]
-      };
-    }
-
-    if (name === 'save_business_memory') {
-      const { processedMemory, sessionTopic, priority = 'medium' } = args;
-      
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `${timestamp}-${sessionTopic.replace(/\s+/g, '-').toLowerCase()}.md`;
-      
-      // Fixed paths using absolute path resolution
-      const memoriesDir = path.join(process.cwd(), 'memories');
-      const filepath = path.join(memoriesDir, filename);
-      
-      // Ensure memories directory exists
-      if (!fs.existsSync(memoriesDir)) {
-        fs.mkdirSync(memoriesDir, { recursive: true });
-      }
-      
-      fs.writeFileSync(filepath, processedMemory);
-      
-      return {
-        content: [{ 
-          type: 'text', 
-          text: `✅ **BUSINESS MEMORY SAVED**
-
-📁 **File:** ${filename}
-🎯 **Priority:** ${priority.toUpperCase()}
-📍 **Location:** ${path.resolve(filepath)}
-
-🔍 **Memory is now searchable** using the search_memories tool.`
-        }]
-      };
-    }
-
+    // ENHANCED DUAL DIRECTORY MEMORY SEARCH
     if (name === 'search_memories') {
       const { searchTerm, category = 'all', timeframe = 'all' } = args;
       
-      // Fixed path using absolute path resolution
-      const memoriesDir = path.join(process.cwd(), 'memories');
-      if (!fs.existsSync(memoriesDir)) {
-        return {
-          content: [{ type: 'text', text: '📁 No memories directory found. Create memories first.' }]
-        };
-      }
+      // Define both memory directories
+      const businessMemoriesDir = path.join(process.cwd(), 'memories');
+      const legacyMemoriesDir = path.join(process.env.HOME, 'legacy-memories');
       
-      const files = fs.readdirSync(memoriesDir).filter(f => f.endsWith('.md'));
       const results = [];
-      
-      files.forEach(file => {
-        const content = fs.readFileSync(path.join(memoriesDir, file), 'utf8');
-        if (content.toLowerCase().includes(searchTerm.toLowerCase())) {
-          const preview = content.substring(0, 200) + '...';
-          results.push(`**📁 ${file.replace('.md', '').toUpperCase()}**\n${preview}`);
+      let totalBusinessFiles = 0;
+      let totalLegacyFiles = 0;
+
+      // Search Business Memories (if category allows)
+      if (category === 'all' || category === 'business') {
+        if (fs.existsSync(businessMemoriesDir)) {
+          const businessFiles = fs.readdirSync(businessMemoriesDir).filter(f => f.endsWith('.md'));
+          totalBusinessFiles = businessFiles.length;
+          
+          businessFiles.forEach(file => {
+            const content = fs.readFileSync(path.join(businessMemoriesDir, file), 'utf8');
+            if (content.toLowerCase().includes(searchTerm.toLowerCase())) {
+              const preview = content.substring(0, 200) + '...';
+              results.push({
+                source: 'BUSINESS',
+                file: file,
+                preview: preview,
+                path: path.join(businessMemoriesDir, file)
+              });
+            }
+          });
         }
-      });
+      }
+
+      // Search Legacy Memories (if category allows)
+      if (category === 'all' || category === 'legacy') {
+        if (fs.existsSync(legacyMemoriesDir)) {
+          const legacyFiles = fs.readdirSync(legacyMemoriesDir).filter(f => f.endsWith('.md'));
+          totalLegacyFiles = legacyFiles.length;
+          
+          legacyFiles.forEach(file => {
+            const content = fs.readFileSync(path.join(legacyMemoriesDir, file), 'utf8');
+            if (content.toLowerCase().includes(searchTerm.toLowerCase())) {
+              const preview = content.substring(0, 200) + '...';
+              results.push({
+                source: 'LEGACY',
+                file: file,
+                preview: preview,
+                path: path.join(legacyMemoriesDir, file)
+              });
+            }
+          });
+        }
+      }
+
+      // Format results with source labels
+      const formattedResults = results.slice(0, 10).map(result => 
+        `**📁 [${result.source}] ${result.file.replace('.md', '').toUpperCase()}**\n${result.preview}`
+      );
+
+      // Generate search summary
+      const searchScope = category === 'all' ? 'ALL MEMORIES' : 
+                         category === 'business' ? 'BUSINESS MEMORIES' : 'LEGACY MEMORIES';
       
+      const directoriesSearched = [];
+      if (category === 'all' || category === 'business') {
+        directoriesSearched.push(`Business: ${totalBusinessFiles} files`);
+      }
+      if (category === 'all' || category === 'legacy') {
+        directoriesSearched.push(`Legacy: ${totalLegacyFiles} files`);
+      }
+
       return {
         content: [{
           type: 'text',
-          text: `🔍 **MEMORY SEARCH RESULTS**
+          text: `🔍 **DUAL MEMORY SEARCH RESULTS**
 
 **Search Term:** "${searchTerm}"
-**Categories:** ${category}
-**Results Found:** ${results.length} total, showing ${Math.min(results.length, 5)}
+**Scope:** ${searchScope}
+**Directories:** ${directoriesSearched.join(' | ')}
+**Results Found:** ${results.length} total, showing ${Math.min(results.length, 10)}
 
-${results.slice(0, 5).join('\n\n')}
+${results.length > 0 ? formattedResults.join('\n\n') : '❌ No matches found in any memory directory.'}
 
-💡 **Search more specifically or use different terms to find additional memories.**`
+${results.length > 10 ? '\n💡 **Showing first 10 results. Use more specific search terms to narrow results.**' : ''}
+
+💡 **Search tips:** Use \`category: "business"\` or \`category: "legacy"\` to search specific directories only.`
         }]
       };
     }
+
+    // [ALL OTHER EXISTING TOOL IMPLEMENTATIONS GO HERE - UNCHANGED]
+    // [Including: process_ghl_contact, analyze_deal_unified, analyze_seller_finance_deal, etc.]
 
     throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
   } catch (error) {

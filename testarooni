@@ -1,4 +1,12 @@
-import React, { useState, useEffect } from 'react';Collin 
+import React, { useState, useEffect } from 'react';Collin hbdfjhsbfcjw
+
+sd
+w
+d
+w
+d
+w
+
 
 const InteractiveDealCalculator = () => {
   // State variables - removed monthlyPaymentToSeller as it's always calculated

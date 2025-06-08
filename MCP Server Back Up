@@ -885,7 +885,7 @@ ${response}
       };
     }
 
-    // MEMORY SYSTEM TOOLS
+// MEMORY SYSTEM TOOLS
     if (name === 'process_business_memory') {
       const { conversationText, sessionTopic, currentContext = 'General business discussion' } = args;
       
@@ -937,10 +937,12 @@ ${response}
       
       const timestamp = new Date().toISOString().split('T')[0];
       const filename = `${timestamp}-${sessionTopic.replace(/\s+/g, '-').toLowerCase()}.md`;
-      const filepath = `./memories/${filename}`;
+      
+      // Fixed paths using absolute path resolution
+      const memoriesDir = path.join(process.cwd(), 'memories');
+      const filepath = path.join(memoriesDir, filename);
       
       // Ensure memories directory exists
-      const memoriesDir = './memories';
       if (!fs.existsSync(memoriesDir)) {
         fs.mkdirSync(memoriesDir, { recursive: true });
       }
@@ -964,7 +966,8 @@ ${response}
     if (name === 'search_memories') {
       const { searchTerm, category = 'all', timeframe = 'all' } = args;
       
-      const memoriesDir = './memories';
+      // Fixed path using absolute path resolution
+      const memoriesDir = path.join(process.cwd(), 'memories');
       if (!fs.existsSync(memoriesDir)) {
         return {
           content: [{ type: 'text', text: '📁 No memories directory found. Create memories first.' }]
@@ -1008,15 +1011,8 @@ ${results.slice(0, 5).join('\n\n')}
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.log(' Collin\'s Complete Real Estate MCP Server v4.0 is LIVE!');
-  console.log(' INTEGRATED WORKFLOW: GHL Contact Processing → Unified Analysis → Targeted Tools');
-  console.log(' BUCKET 2 COMPLETE: Seller Finance + Cash Wholesale + GHL Integration');
-  console.log(' KEY FEATURES: No guessing, flag missing data, side-by-side comparison');
-  console.log(' NEW: Week in Review analysis for 250+ weekly offers with error detection');
-  console.log(' DEPLOYMENT STATUS: Full production ready - let\'s test and iterate!');
-  console.log(' Ready for BUCKET 3: Message Prioritization (Next Phase)');
+  // MCP Server ready - no console.log output to avoid JSON parsing errors
 }
-
 main().catch((error) => {
   console.error('Server error:', error);
   process.exit(1);

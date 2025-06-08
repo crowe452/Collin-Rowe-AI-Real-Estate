@@ -345,7 +345,7 @@ ${missingData.map(item => `- ${item}`).join('\n')}
       const sfCocReturn = sfEntryFee > 0 ? (sfCashFlow * 12 / sfEntryFee) * 100 : 0;
 
       // Deal qualification for seller finance
-      const sfQualifies = sfCocReturn >= 28 && sfCashFlow >= 200;
+      const sfQualifies = sfCocReturn >= 12 && sfCashFlow >= 200;
       const cashViable = cashMaxOffer > askingPrice * 0.5; // At least 50% of asking
 
       return {
@@ -404,7 +404,7 @@ ${missingData.map(item => `- ${item}`).join('\n')}
 
 ### 💼 SELLER FINANCE STATUS
 **Qualification:** ${sfQualifies ? '✅ QUALIFIES' : '❌ NEEDS WORK'}
-${!sfQualifies ? `- ${sfCocReturn < 28 ? 'CoC below 28% target' : ''} ${sfCashFlow < 200 ? 'Cash flow below $200' : ''}` : ''}
+${!sfQualifies ? `- ${sfCocReturn < 12 ? 'CoC below 12% target' : ''} ${sfCashFlow < 200 ? 'Cash flow below $200' : ''}` : ''}
 
 ---
 
@@ -478,8 +478,8 @@ ${cashViable ? '1. **Use cash wholesale tool** for detailed cash analysis' : ''}
       const totalEntryFee = downPaymentAmount + rehabCosts + closingCosts + assignmentFees;
       const cocReturn = totalEntryFee > 0 ? (annualCashFlow / totalEntryFee) * 100 : 0;
 
-      // Deal qualification (28% CoC + $200 cash flow)
-      const qualifies = cocReturn >= 28 && netCashFlow >= 200;
+      // Deal qualification (12% CoC + $200 cash flow)
+      const qualifies = cocReturn >= 12 && netCashFlow >= 200;
 
       return {
         content: [{
@@ -520,7 +520,7 @@ ${other > 0 ? `- **Other:** $${other}/month` : ''}
 - **Total Entry:** $${Math.round(totalEntryFee).toLocaleString()}
 
 ${qualifies ? '🚀 **DEAL MEETS TARGET CRITERIA**' : '⚠️ **NEEDS OPTIMIZATION**'}
-${!qualifies ? `\n**Issues:** ${cocReturn < 28 ? 'CoC below 28% target' : ''} ${netCashFlow < 200 ? 'Cash flow below $200 target' : ''}` : ''}
+${!qualifies ? `\n**Issues:** ${cocReturn < 12 ? 'CoC below 12% target' : ''} ${netCashFlow < 200 ? 'Cash flow below $200 target' : ''}` : ''}
 
 ## 🎯 SKYWATCH CALCULATOR INTEGRATION
 **Use interactive Skywatch calculator to optimize:**

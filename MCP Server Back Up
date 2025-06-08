@@ -15,7 +15,7 @@ import path from 'path';
 const server = new Server(
   {
     name: 'collin-enhanced-real-estate-mcp',
-    version: '6.0.0',
+    version: '6.1.0',
   },
   {
     capabilities: {
@@ -69,84 +69,111 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {
+            // OPTIONAL REFERENCE FIELD
             propertyAddress: {
               type: 'string',
-              description: 'Property address',
+              description: 'Property address (optional - for reference only)'
             },
+            // REQUIRED FIELDS - NO ASSUMPTIONS
             purchasePrice: {
               type: 'number',
-              description: 'Purchase price of property',
+              description: 'Purchase price of property'
             },
             downPaymentAmount: {
               type: 'number',
-              description: 'Down payment in dollars (not percentage)',
-            },
-            interestRate: {
-              type: 'number',
-              description: 'Interest rate percentage (e.g., 5.5 for 5.5%)',
-              default: 0,
-            },
-            amortization: {
-              type: 'number',
-              description: 'Amortization period in years',
-              default: 30,
-            },
-            balloonYears: {
-              type: 'number',
-              description: 'Balloon term in years',
-              default: 10,
+              description: 'Down payment in dollars (not percentage)'
             },
             monthlyRent: {
               type: 'number',
-              description: 'Expected monthly rent',
+              description: 'Expected monthly rent'
             },
             propertyTax: {
               type: 'number',
-              description: 'Monthly property tax',
-              default: 70,
+              description: 'Monthly property tax (varies by location - REQUIRED)'
             },
             insurance: {
               type: 'number',
-              description: 'Monthly insurance',
-              default: 50,
+              description: 'Monthly insurance (varies by property - REQUIRED)'
             },
-            hoa: {
+            interestRate: {
               type: 'number',
-              description: 'Monthly HOA fees',
-              default: 0,
+              description: 'Interest rate percentage (e.g., 5.5 for 5.5%) - REQUIRED'
             },
-            other: {
+            amortization: {
               type: 'number',
-              description: 'Other monthly expenses',
-              default: 0,
+              description: 'Amortization period in years - REQUIRED'
             },
+            balloonYears: {
+              type: 'number',
+              description: 'Balloon term in years - REQUIRED'
+            },
+            
+            // DEFAULTS ONLY FOR THESE 3 FIELDS
             capexMaintPercent: {
               type: 'number',
               description: 'CapEx & Maintenance as % of rent',
-              default: 20,
+              default: 10
             },
             managementPercent: {
               type: 'number',
               description: 'Management as % of rent',
-              default: 20,
+              default: 10
             },
-            vacancyPercent: {
+            appreciationPercent: {
               type: 'number',
-              description: 'Vacancy as % of rent',
-              default: 0,
+              description: 'Annual appreciation percentage',
+              default: 3
             },
+            
+            // REASONABLE DEFAULTS FOR NON-CRITICAL FIELDS
             rehabCosts: {
               type: 'number',
               description: 'Estimated rehab costs',
-              default: 0,
+              default: 0
             },
             assignmentFees: {
               type: 'number',
               description: 'Assignment/wholesale fees',
-              default: 3000,
+              default: 5000
             },
+            agentCommissionRate: {
+              type: 'number',
+              description: 'Agent commission percentage',
+              default: 3
+            },
+            hoa: {
+              type: 'number',
+              description: 'Monthly HOA fees',
+              default: 0
+            },
+            other: {
+              type: 'number',
+              description: 'Other monthly expenses',
+              default: 0
+            },
+            vacancyPercent: {
+              type: 'number',
+              description: 'Vacancy as % of rent',
+              default: 0
+            },
+            // OUTPUT MODE SELECTION
+            outputMode: {
+              type: 'string',
+              description: 'Analysis detail level: "comprehensive" or "summary"',
+              enum: ['comprehensive', 'summary'],
+              default: 'comprehensive'
+            }
           },
-          required: ['propertyAddress', 'purchasePrice', 'downPaymentAmount', 'monthlyRent'],
+          required: [
+            'purchasePrice', 
+            'downPaymentAmount', 
+            'monthlyRent',
+            'propertyTax',
+            'insurance', 
+            'interestRate',
+            'amortization',
+            'balloonYears'
+          ]
         },
       },
       
@@ -429,142 +456,296 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (name === 'analyze_seller_finance_deal') {
-      const { 
-        propertyAddress, 
-        purchasePrice, 
-        downPaymentAmount, 
-        interestRate = 0, 
-        amortization = 30, 
-        balloonYears = 10, 
+      // REQUIRED FOR CALCULATIONS (not property address)
+      const requiredFields = [
+        'purchasePrice', 'downPaymentAmount', 'monthlyRent',
+        'propertyTax', 'insurance', 'interestRate', 'amortization', 'balloonYears'
+      ];
+      
+      const missingFields = requiredFields.filter(field => 
+        args[field] === undefined || args[field] === null || args[field] === ''
+      );
+      
+      if (missingFields.length > 0) {
+        return {
+          content: [{
+            type: 'text',
+            text: `📋 **MISSING REQUIRED DATA**
+
+To complete the analysis, I need:
+
+${missingFields.map(field => {
+  const fieldNames = {
+    'purchasePrice': '• **Purchase Price**: Dollar amount (e.g., 85000)',
+    'downPaymentAmount': '• **Down Payment**: Dollar amount (e.g., 10000)', 
+    'monthlyRent': '• **Monthly Rent**: Expected rental income (e.g., 1250)',
+    'propertyTax': '• **Property Tax**: Monthly amount (e.g., 70)',
+    'insurance': '• **Monthly Insurance**: Property insurance (e.g., 50)',
+    'interestRate': '• **Interest Rate**: Percentage (e.g., 6 for 6%)',
+    'amortization': '• **Amortization**: Loan term in years (e.g., 30)',
+    'balloonYears': '• **Balloon Term**: When due in years (e.g., 10)'
+  };
+  return fieldNames[field] || `• ${field}`;
+}).join('\n')}
+
+**Example:**
+"Analyze $85,000 purchase, $10,000 down, $1,250 rent, $70 tax, $50 insurance, 6% interest, 30 year amortization, 10 year balloon"
+
+💡 **Perfect for counter-offer analysis:** "They countered $150k purchase price, is it still feasible?"`
+          }]
+        };
+      }
+
+      const {
+        propertyAddress = 'Property Analysis',  // Optional for display
+        purchasePrice,
+        downPaymentAmount,
         monthlyRent,
-        propertyTax = 70,
-        insurance = 50,
+        propertyTax,
+        insurance,
+        interestRate,
+        amortization,
+        balloonYears,
+        // Only these have defaults
+        capexMaintPercent = 10,
+        managementPercent = 10,
+        appreciationPercent = 3,
+        // Reasonable defaults for non-critical
+        rehabCosts = 0,
+        assignmentFees = 5000,
+        agentCommissionRate = 3,
         hoa = 0,
         other = 0,
-        capexMaintPercent = 20,
-        managementPercent = 20,
         vacancyPercent = 0,
-        rehabCosts = 0,
-        assignmentFees = 3000
+        outputMode = 'comprehensive'
       } = args;
 
-      // Core calculations
+      // Core calculations (matching Skywatch exactly)
       const downPayment = downPaymentAmount;
       const downPaymentPercent = purchasePrice > 0 ? (downPayment / purchasePrice) * 100 : 0;
       const loanAmount = purchasePrice - downPayment;
       
-      // Monthly payment calculation (P&I)
+      // Monthly P&I calculation (mathematically correct)
       const monthlyRate = interestRate / 100 / 12;
       const totalPayments = amortization * 12;
-      
       let monthlyPI = 0;
+      
       if (monthlyRate > 0) {
         monthlyPI = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
-                   (Math.pow(1 + monthlyRate, totalPayments) - 1);
+                    (Math.pow(1 + monthlyRate, totalPayments) - 1);
       } else {
-        monthlyPI = loanAmount / totalPayments;
+        monthlyPI = totalPayments > 0 ? loanAmount / totalPayments : 0;
       }
-      
+
       // Balloon balance calculation
       const balloonPayments = balloonYears * 12;
       let remainingBalance = 0;
+      let totalInterestPaid = 0;
+      let totalPrincipalPaid = 0;
+      let totalPaymentsMade = 0;
       
-      if (monthlyRate > 0 && balloonPayments < totalPayments) {
-        remainingBalance = loanAmount * Math.pow(1 + monthlyRate, balloonPayments) - 
-                          monthlyPI * (Math.pow(1 + monthlyRate, balloonPayments) - 1) / monthlyRate;
+      if (monthlyRate > 0 && balloonPayments > 0) {
+        totalPaymentsMade = monthlyPI * balloonPayments;
+        const totalPayments = amortization * 12;
+        if (balloonPayments < totalPayments) {
+          remainingBalance = loanAmount * Math.pow(1 + monthlyRate, balloonPayments) - 
+                            monthlyPI * (Math.pow(1 + monthlyRate, balloonPayments) - 1) / monthlyRate;
+        }
+        totalPrincipalPaid = loanAmount - remainingBalance;
+        totalInterestPaid = totalPaymentsMade - totalPrincipalPaid;
+      } else if (monthlyRate === 0) {
+        totalPaymentsMade = monthlyPI * balloonPayments;
+        totalPrincipalPaid = totalPaymentsMade;
+        totalInterestPaid = 0;
+        remainingBalance = Math.max(0, loanAmount - totalPrincipalPaid);
       }
-      
-      // Operating expenses calculation
-      const capexMaint = monthlyRent * (capexMaintPercent / 100);
-      const management = monthlyRent * (managementPercent / 100);
-      const vacancy = monthlyRent * (vacancyPercent / 100);
-      
-      const totalMonthlyOperatingExpenses = propertyTax + insurance + hoa + other + capexMaint + management + vacancy;
-      const effectiveRent = monthlyRent - vacancy;
-      const netOperatingIncome = effectiveRent - (propertyTax + insurance + hoa + other + capexMaint + management);
-      const monthlyCashFlow = netOperatingIncome - monthlyPI;
+
+      // Agent commission calculations
+      const agentCommission = purchasePrice * (agentCommissionRate / 100);
+      const sellerCashAtClosing = downPayment - agentCommission;
+      const downPaymentCoversCommission = downPayment >= agentCommission;
+
+      // Operating expenses (matching Skywatch)
+      const effectiveRent = monthlyRent * (1 - vacancyPercent / 100);
+      const capexMaint = effectiveRent * (capexMaintPercent / 100);
+      const management = effectiveRent * (managementPercent / 100);
+      const totalMonthlyOperatingExpenses = propertyTax + insurance + capexMaint + management + monthlyPI + hoa + other;
+      const monthlyCashFlow = effectiveRent - totalMonthlyOperatingExpenses;
       const annualCashFlow = monthlyCashFlow * 12;
-      
-      // Buyer Entry Fee calculation
-      const closingCosts = purchasePrice * 0.02; // 2% of purchase price
+
+      // Buyer entry fee calculation
+      const closingCosts = purchasePrice * 0.02;
       const buyerEntryFee = downPayment + rehabCosts + closingCosts + assignmentFees;
       const buyerEntryFeePercent = (buyerEntryFee / purchasePrice) * 100;
-      
-      // Cash on Cash Return (using total cash invested)
-      const totalCashInvested = buyerEntryFee;
-      const cashOnCashReturn = totalCashInvested > 0 ? (annualCashFlow / totalCashInvested) * 100 : 0;
-      
-      // Deal qualification criteria
+      const adjustedCashOnCash = buyerEntryFee > 0 ? (annualCashFlow / buyerEntryFee) * 100 : 0;
+
+      // Appreciation calculations
+      const currentMarketValue = purchasePrice * 0.90; // Assume buying at 110% of market
+      const appreciatedMarketValue = currentMarketValue * Math.pow(1 + appreciationPercent / 100, balloonYears);
+      const equityAtBalloon = appreciatedMarketValue - remainingBalance;
+      const refinanceLTV = remainingBalance / appreciatedMarketValue;
+      const canRefinance = refinanceLTV <= 0.80;
+
+      // Seller's total benefit
+      const sellersNetProfit = downPayment + totalPaymentsMade + remainingBalance - agentCommission;
+
+      // DEAL QUALIFICATION CRITERIA (Enhanced)
       const dealCriteria = {
-        buyerEntryMeetsTarget: buyerEntryFeePercent <= 20, // ≤20% buyer entry
-        cashFlowMeetsTarget: monthlyCashFlow >= 200,       // $200+ monthly cash flow
-        cocMeetsTarget: cashOnCashReturn >= 12             // 12%+ cash on cash return
+        buyerEntryMeetsTarget: buyerEntryFeePercent <= 20,
+        cashFlowMeetsTarget: monthlyCashFlow >= 200,
+        cocMeetsTarget: adjustedCashOnCash >= 12,
+        sellerCashPositive: sellerCashAtClosing >= 0, // NEW: Seller gets cash at closing
+        dealQualifies: function() {
+          return this.buyerEntryMeetsTarget && this.cashFlowMeetsTarget && 
+                 this.cocMeetsTarget && this.sellerCashPositive;
+        }
       };
-      
-      const isQualifiedDeal = dealCriteria.buyerEntryMeetsTarget && dealCriteria.cashFlowMeetsTarget && dealCriteria.cocMeetsTarget;
-      
+
+      // Format output based on mode
+      const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }).format(amount || 0);
+      };
+
+      const formatPercent = (percent) => `${(percent || 0).toFixed(2)}%`;
+
+      // SUMMARY OUTPUT
+      const summaryOutput = `
+🏠 **${propertyAddress}** | ${dealCriteria.dealQualifies() ? '🚀 QUALIFIES' : '🛑 NEEDS WORK'}
+
+**💰 SELLER GETS:** ${formatCurrency(sellerCashAtClosing)} cash at closing ${downPaymentCoversCommission ? '✅' : '❌'}
+**🤝 OFFER:** ${formatCurrency(purchasePrice)} | ${formatCurrency(downPayment)} down | ${formatCurrency(monthlyPI)}/month | ${balloonYears}yr balloon
+
+**📊 BUYER METRICS:**
+• Entry Fee: ${formatPercent(buyerEntryFeePercent)} (Target: ≤20%) ${dealCriteria.buyerEntryMeetsTarget ? '✅' : '❌'}
+• Cash Flow: ${formatCurrency(monthlyCashFlow)}/month (Target: $200+) ${dealCriteria.cashFlowMeetsTarget ? '✅' : '❌'}  
+• Cash-on-Cash: ${formatPercent(adjustedCashOnCash)} (Target: 12%+) ${dealCriteria.cocMeetsTarget ? '✅' : '❌'}
+
+**🎈 BALLOON (Year ${balloonYears}):** ${formatCurrency(remainingBalance)} remaining | ${formatCurrency(sellersNetProfit)} total seller benefit
+
+**💡 FEASIBILITY:** ${dealCriteria.dealQualifies() ? 
+  '✅ **MEETS ALL CRITERIA** - Counter-offer is viable!' : 
+  '⚠️ **OUTSIDE LIMITS** - May need further negotiation'}
+
+${dealCriteria.dealQualifies() ? 
+  '✅ **READY TO ACCEPT** - All criteria met!' : 
+  '⚠️ **NEEDS OPTIMIZATION** - Use "optimize for [target]" commands'}
+`;
+
+      // COMPREHENSIVE OUTPUT
+      const comprehensiveOutput = `
+🏠 **SELLER FINANCE ANALYSIS: ${propertyAddress}**
+
+${dealCriteria.dealQualifies() ? '🚀 **DEAL QUALIFIES!**' : '🛑 **DEAL NEEDS WORK**'}
+
+╔══════════════════════════════════════════════════════════════════
+║ 💰 **SELLER'S CASH AT CLOSING** (${agentCommissionRate}% commission)
+╚══════════════════════════════════════════════════════════════════
+• Down Payment: ${formatCurrency(downPayment)}
+• Agent Commission: -${formatCurrency(agentCommission)}
+• **Seller Nets: ${formatCurrency(sellerCashAtClosing)}** ${downPaymentCoversCommission ? '✅' : '❌ SELLER OWES MONEY!'}
+
+╔══════════════════════════════════════════════════════════════════
+║ 🤝 **SELLER FINANCE OFFER SUMMARY**
+╚══════════════════════════════════════════════════════════════════
+• **Offer Price: ${formatCurrency(purchasePrice)}**
+• Down Payment: ${formatCurrency(downPayment)} (${formatPercent(downPaymentPercent)})
+• Monthly Payment: ${formatCurrency(monthlyPI)}
+• Interest Rate: ${formatPercent(interestRate)}
+• Amortization: ${amortization} years
+• Balloon Term: ${balloonYears} years
+• **Seller's Total Benefit: ${formatCurrency(sellersNetProfit)}**
+
+╔══════════════════════════════════════════════════════════════════
+║ 📊 **DEAL QUALIFICATION STATUS**
+╚══════════════════════════════════════════════════════════════════
+• Buyer Entry Fee: ${formatPercent(buyerEntryFeePercent)} (Target: ≤20%) ${dealCriteria.buyerEntryMeetsTarget ? '✅' : '❌'}
+• Monthly Cash Flow: ${formatCurrency(monthlyCashFlow)} (Target: $200+) ${dealCriteria.cashFlowMeetsTarget ? '✅' : '❌'}
+• Cash-on-Cash Return: ${formatPercent(adjustedCashOnCash)} (Target: 12%+) ${dealCriteria.cocMeetsTarget ? '✅' : '❌'}
+• Seller Gets Cash: ${sellerCashAtClosing >= 0 ? '✅ YES' : '❌ NO'} (${formatCurrency(sellerCashAtClosing)})
+
+╔══════════════════════════════════════════════════════════════════
+║ 💸 **CASHFLOW BREAKDOWN**
+╚══════════════════════════════════════════════════════════════════
+• Monthly Rent: ${formatCurrency(monthlyRent)}
+• Operating Expenses: ${formatCurrency(totalMonthlyOperatingExpenses)}
+  - P&I Payment: ${formatCurrency(monthlyPI)}
+  - Property Tax: ${formatCurrency(propertyTax)}
+  - Insurance: ${formatCurrency(insurance)}
+  - CapEx/Maint (${capexMaintPercent}%): ${formatCurrency(capexMaint)}
+  - Management (${managementPercent}%): ${formatCurrency(management)}
+  - HOA: ${formatCurrency(hoa)}
+  - Other: ${formatCurrency(other)}
+• **Net Cash Flow: ${formatCurrency(monthlyCashFlow)}/month**
+• **Annual Cash Flow: ${formatCurrency(annualCashFlow)}**
+
+╔══════════════════════════════════════════════════════════════════
+║ 💰 **BUYER ENTRY FEE BREAKDOWN**
+╚══════════════════════════════════════════════════════════════════
+• Down Payment: ${formatCurrency(downPayment)}
+• Rehab Costs: ${formatCurrency(rehabCosts)}
+• Closing Costs (2%): ${formatCurrency(closingCosts)}
+• Assignment Fees: ${formatCurrency(assignmentFees)}
+• **Total Entry: ${formatCurrency(buyerEntryFee)} (${formatPercent(buyerEntryFeePercent)})**
+
+╔══════════════════════════════════════════════════════════════════
+║ 🎈 **BALLOON DETAILS (Year ${balloonYears})**
+╚══════════════════════════════════════════════════════════════════
+• Remaining Balance: ${formatCurrency(remainingBalance)}
+• Total Payments Made: ${formatCurrency(totalPaymentsMade)}
+• Interest Paid: ${formatCurrency(totalInterestPaid)}
+• Principal Paid: ${formatCurrency(totalPrincipalPaid)}
+
+╔══════════════════════════════════════════════════════════════════
+║ 📈 **APPRECIATION ANALYSIS** (${formatPercent(appreciationPercent)}/year)
+╚══════════════════════════════════════════════════════════════════
+• Current Market Value: ${formatCurrency(currentMarketValue)}
+• Future Value (Year ${balloonYears}): ${formatCurrency(appreciatedMarketValue)}
+• Equity at Balloon: ${formatCurrency(equityAtBalloon)}
+• Refinance LTV: ${formatPercent(refinanceLTV * 100)}
+• Can Refinance at 80%?: ${canRefinance ? '✅ YES' : '❌ NO'}
+
+${dealCriteria.dealQualifies() ? 
+  '🎯 **RECOMMENDATION: ACCEPT COUNTER-OFFER** - All criteria met!' : 
+  '⚠️ **RECOMMENDATION: NEGOTIATE FURTHER** - Use optimization commands below'}
+
+📝 **Next Steps:**
+• **Counter-offer check**: "They countered $150k, is it feasible?"
+• **Optimization**: "Optimize this deal for 15% cash-on-cash return"  
+• **Quick summary**: "Show me the summary version of this analysis"
+`;
+
       return {
         content: [
           {
             type: 'text',
-            text: `# 🏠 SELLER FINANCE ANALYSIS - ${propertyAddress}
-
-## 📊 DEAL SUMMARY
-- **Purchase Price:** $${purchasePrice.toLocaleString()}
-- **Down Payment:** $${Math.round(downPayment).toLocaleString()} (${downPaymentPercent.toFixed(1)}%)
-- **Loan Amount:** $${Math.round(loanAmount).toLocaleString()}
-- **Interest Rate:** ${interestRate}%
-- **Amortization:** ${amortization} years
-- **Balloon Term:** ${balloonYears} years
-
-## 💰 MONTHLY CASH FLOW BREAKDOWN
-**INCOME:**
-- Gross Monthly Rent: $${monthlyRent.toLocaleString()}
-- Less Vacancy (${vacancyPercent}%): -$${Math.round(vacancy)}
-- **Effective Rent: $${Math.round(effectiveRent).toLocaleString()}**
-
-**OPERATING EXPENSES:**
-- Property Tax: $${propertyTax}
-- Insurance: $${insurance}
-- HOA: $${hoa}
-- Other: $${other}
-- CapEx & Maintenance (${capexMaintPercent}%): $${Math.round(capexMaint)}
-- Management (${managementPercent}%): $${Math.round(management)}
-- **Total Operating Expenses: $${Math.round(totalMonthlyOperatingExpenses).toLocaleString()}**
-
-**NET OPERATING INCOME: $${Math.round(netOperatingIncome).toLocaleString()}**
-
-**DEBT SERVICE:**
-- Principal & Interest: $${Math.round(monthlyPI)}
-
-## 🎯 FINAL RESULTS
-- **Monthly Cash Flow: $${Math.round(monthlyCashFlow).toLocaleString()}**
-- **Annual Cash Flow: $${Math.round(annualCashFlow).toLocaleString()}**
-- **Balloon Balance: $${Math.round(remainingBalance).toLocaleString()}**
-
-## 💵 BUYER ENTRY FEE ANALYSIS
-- Down Payment: $${Math.round(downPayment).toLocaleString()}
-- Rehab Costs: $${rehabCosts.toLocaleString()}
-- Closing Costs (2%): $${Math.round(closingCosts).toLocaleString()}
-- Assignment Fees: $${assignmentFees.toLocaleString()}
-- **TOTAL BUYER ENTRY FEE: $${Math.round(buyerEntryFee).toLocaleString()} (${buyerEntryFeePercent.toFixed(1)}%)**
-
-## 📈 CASH ON CASH RETURN
-- **${cashOnCashReturn.toFixed(1)}%** (Annual Cash Flow ÷ Total Cash Invested)
-
-## 🎯 DEAL QUALIFICATION RESULTS
-
-${dealCriteria.buyerEntryMeetsTarget ? '✅' : '❌'} **BUYER ENTRY ≤20%:** ${buyerEntryFeePercent.toFixed(1)}% ${dealCriteria.buyerEntryMeetsTarget ? '(PASSES)' : '(FAILS)'}
-${dealCriteria.cashFlowMeetsTarget ? '✅' : '❌'} **CASH FLOW ≥$200:** $${Math.round(monthlyCashFlow)} ${dealCriteria.cashFlowMeetsTarget ? '(PASSES)' : '(FAILS)'}
-${dealCriteria.cocMeetsTarget ? '✅' : '❌'} **COC RETURN ≥12%:** ${cashOnCashReturn.toFixed(1)}% ${dealCriteria.cocMeetsTarget ? '(PASSES)' : '(FAILS)'}
-
-## ${isQualifiedDeal ? '🚀 DEAL QUALIFIED - PROCEED!' : '🛑 DEAL NOT QUALIFIED'}
-
-${isQualifiedDeal ? 
-  '**This deal meets all seller finance criteria and is recommended for pursuit.**' : 
-  '**This deal does not meet minimum criteria. Consider negotiating better terms or pass.**'}`
-          },
+            text: outputMode === 'summary' ? summaryOutput : comprehensiveOutput
+          }
         ],
+        dealData: {
+          // Store calculation data for optimization use
+          calculations: {
+            monthlyPI,
+            monthlyCashFlow,
+            adjustedCashOnCash,
+            buyerEntryFeePercent,
+            sellerCashAtClosing,
+            dealCriteria,
+            // All input parameters for adjustments
+            purchasePrice,
+            downPaymentAmount,
+            interestRate,
+            amortization,
+            balloonYears,
+            monthlyRent,
+            propertyTax,
+            insurance
+          }
+        }
       };
     }
 

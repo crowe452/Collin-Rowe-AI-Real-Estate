@@ -1,0 +1,1007 @@
+#!/usr/bin/env node
+
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  CallToolRequestSchema,
+  ErrorCode,
+  ListToolsRequestSchema,
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js';
+import fs from 'fs';
+import path from 'path';
+
+// Create server instance - Collin's Enhanced Real Estate + Business Memory MCP Server
+const server = new Server(
+  {
+    name: 'collin-enhanced-real-estate-mcp',
+    version: '6.0.0',
+  },
+  {
+    capabilities: {
+      tools: {},
+    },
+  }
+);
+
+// Complete Enhanced Real Estate + Business Memory Tools
+server.setRequestHandler(ListToolsRequestSchema, async () => {
+  return {
+    tools: [
+      {
+        name: 'analyze_property',
+        description: 'Analyze real estate property for wholesale potential',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            address: {
+              type: 'string',
+              description: 'Property address',
+            },
+            askingPrice: {
+              type: 'number',
+              description: 'Asking price of the property',
+            },
+            bedrooms: {
+              type: 'number',
+              description: 'Number of bedrooms',
+            },
+            bathrooms: {
+              type: 'number',
+              description: 'Number of bathrooms',
+            },
+            squareFootage: {
+              type: 'number',
+              description: 'Square footage of the property',
+            },
+            yearBuilt: {
+              type: 'number',
+              description: 'Year the property was built',
+            },
+          },
+          required: ['address', 'askingPrice'],
+        },
+      },
+      
+      {
+        name: 'analyze_seller_finance_deal',
+        description: 'Complete seller finance analysis using Skywatch calculator logic with deal qualification',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            propertyAddress: {
+              type: 'string',
+              description: 'Property address',
+            },
+            purchasePrice: {
+              type: 'number',
+              description: 'Purchase price of property',
+            },
+            downPaymentAmount: {
+              type: 'number',
+              description: 'Down payment in dollars (not percentage)',
+            },
+            interestRate: {
+              type: 'number',
+              description: 'Interest rate percentage (e.g., 5.5 for 5.5%)',
+              default: 0,
+            },
+            amortization: {
+              type: 'number',
+              description: 'Amortization period in years',
+              default: 30,
+            },
+            balloonYears: {
+              type: 'number',
+              description: 'Balloon term in years',
+              default: 10,
+            },
+            monthlyRent: {
+              type: 'number',
+              description: 'Expected monthly rent',
+            },
+            propertyTax: {
+              type: 'number',
+              description: 'Monthly property tax',
+              default: 70,
+            },
+            insurance: {
+              type: 'number',
+              description: 'Monthly insurance',
+              default: 50,
+            },
+            hoa: {
+              type: 'number',
+              description: 'Monthly HOA fees',
+              default: 0,
+            },
+            other: {
+              type: 'number',
+              description: 'Other monthly expenses',
+              default: 0,
+            },
+            capexMaintPercent: {
+              type: 'number',
+              description: 'CapEx & Maintenance as % of rent',
+              default: 20,
+            },
+            managementPercent: {
+              type: 'number',
+              description: 'Management as % of rent',
+              default: 20,
+            },
+            vacancyPercent: {
+              type: 'number',
+              description: 'Vacancy as % of rent',
+              default: 0,
+            },
+            rehabCosts: {
+              type: 'number',
+              description: 'Estimated rehab costs',
+              default: 0,
+            },
+            assignmentFees: {
+              type: 'number',
+              description: 'Assignment/wholesale fees',
+              default: 3000,
+            },
+          },
+          required: ['propertyAddress', 'purchasePrice', 'downPaymentAmount', 'monthlyRent'],
+        },
+      },
+      
+      {
+        name: 'calculate_offer',
+        description: 'Calculate wholesale offer based on property analysis',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            arv: {
+              type: 'number',
+              description: 'After Repair Value estimate',
+            },
+            repairCosts: {
+              type: 'number',
+              description: 'Estimated repair costs',
+            },
+            wholesaleFee: {
+              type: 'number',
+              description: 'Desired wholesale fee',
+              default: 5000,
+            },
+          },
+          required: ['arv', 'repairCosts'],
+        },
+      },
+      
+      {
+        name: 'analyze_message_and_respond',
+        description: 'Analyze incoming GHL message, underwrite property if needed, generate intelligent response',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            messageContent: {
+              type: 'string',
+              description: 'The actual message content from seller/agent',
+            },
+            senderInfo: {
+              type: 'string',
+              description: 'Information about who sent the message',
+            },
+            propertyAddress: {
+              type: 'string',
+              description: 'Property address if mentioned in message',
+            },
+            messageType: {
+              type: 'string',
+              description: 'Type of message: interest, question, negotiation, or general',
+              enum: ['interest', 'question', 'negotiation', 'general'],
+            },
+            previousContext: {
+              type: 'string',
+              description: 'Any previous conversation context',
+              default: '',
+            },
+          },
+          required: ['messageContent', 'messageType'],
+        },
+      },
+      
+      {
+        name: 'underwrite_from_inquiry',
+        description: 'Perform quick underwriting analysis when someone expresses interest in a property',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            propertyAddress: {
+              type: 'string',
+              description: 'Property address from the inquiry',
+            },
+            askingPrice: {
+              type: 'number',
+              description: 'Asking price if mentioned',
+            },
+            propertyDetails: {
+              type: 'string',
+              description: 'Any property details mentioned in the inquiry',
+            },
+            urgencyLevel: {
+              type: 'string',
+              description: 'How urgent the seller seems',
+              enum: ['low', 'medium', 'high'],
+              default: 'medium',
+            },
+          },
+          required: ['propertyAddress'],
+        },
+      },
+      
+      {
+        name: 'generate_seller_response',
+        description: 'Generate personalized response to seller based on analysis and inquiry type',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            analysisResult: {
+              type: 'string',
+              description: 'Results from property analysis or underwriting',
+            },
+            responseType: {
+              type: 'string',
+              description: 'Type of response needed',
+              enum: ['initial_interest', 'offer_presentation', 'negotiation', 'follow_up', 'information_request'],
+            },
+            sellerPersonality: {
+              type: 'string',
+              description: 'Seller personality assessment from message tone',
+              enum: ['motivated', 'analytical', 'emotional', 'business_focused', 'uncertain'],
+              default: 'business_focused',
+            },
+            offerAmount: {
+              type: 'number',
+              description: 'Calculated offer amount if applicable',
+            },
+            financingOptions: {
+              type: 'string',
+              description: 'Seller financing options to present',
+            },
+          },
+          required: ['analysisResult', 'responseType'],
+        },
+      },
+      
+      {
+        name: 'process_business_memory',
+        description: 'Process current conversation into structured business memory with progress tracking',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            conversationText: {
+              type: 'string',
+              description: 'The current conversation content to analyze',
+            },
+            sessionTopic: {
+              type: 'string',
+              description: 'Main topic or focus of this session',
+            },
+            currentContext: {
+              type: 'string',
+              description: 'What we were working on or building',
+              default: 'General business discussion',
+            },
+          },
+          required: ['conversationText', 'sessionTopic'],
+        },
+      },
+      
+      {
+        name: 'save_business_memory',
+        description: 'Save processed business memory to persistent storage with search capability',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            processedMemory: {
+              type: 'string',
+              description: 'The formatted business memory content to save',
+            },
+            sessionTopic: {
+              type: 'string',
+              description: 'Topic for filename and categorization',
+            },
+            priority: {
+              type: 'string',
+              description: 'Priority level: high, medium, low',
+              default: 'medium',
+            },
+          },
+          required: ['processedMemory', 'sessionTopic'],
+        },
+      },
+      
+      {
+        name: 'search_memories',
+        description: 'Search through all saved business memories',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            searchTerm: {
+              type: 'string',
+              description: 'Term or phrase to search for in memories',
+            },
+            category: {
+              type: 'string',
+              description: 'Optional category filter: running, detailed, all',
+              default: 'all',
+            },
+            timeframe: {
+              type: 'string',
+              description: 'Optional time filter: week, month, all',
+              default: 'all',
+            },
+          },
+          required: ['searchTerm'],
+        },
+      },
+      
+      {
+        name: 'process_legacy_memory',
+        description: 'Process scattered legacy memory files into standardized business format',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            legacyContent: {
+              type: 'string',
+              description: 'Raw legacy memory content from various sources',
+            },
+            sourceType: {
+              type: 'string',
+              description: 'Type of legacy source: vision, template, strategy, technical, personal',
+              enum: ['vision', 'template', 'strategy', 'technical', 'personal'],
+            },
+            originalDate: {
+              type: 'string',
+              description: 'Original date or time period if known',
+              default: 'Unknown date',
+            },
+          },
+          required: ['legacyContent', 'sourceType'],
+        },
+      },
+      
+      {
+        name: 'save_legacy_memory',
+        description: 'Save processed legacy content to organized storage',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            processedLegacy: {
+              type: 'string',
+              description: 'The standardized legacy memory content',
+            },
+            sourceType: {
+              type: 'string',
+              description: 'Category of legacy content',
+            },
+            originalDate: {
+              type: 'string',
+              description: 'Original timeframe',
+            },
+          },
+          required: ['processedLegacy', 'sourceType'],
+        },
+      },
+    ],
+  };
+});
+
+// Handle tool execution with enhanced capabilities
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  try {
+    if (name === 'analyze_property') {
+      const { address, askingPrice, bedrooms, bathrooms, squareFootage, yearBuilt } = args;
+      
+      // Basic property analysis logic
+      const pricePerSqFt = squareFootage ? askingPrice / squareFootage : null;
+      const isOldProperty = yearBuilt && (new Date().getFullYear() - yearBuilt) > 30;
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Property Analysis for ${address}:
+            
+📍 Address: ${address}
+💰 Asking Price: $${askingPrice.toLocaleString()}
+🏠 Specs: ${bedrooms}BR/${bathrooms}BA, ${squareFootage} sq ft
+📅 Built: ${yearBuilt}
+📊 Price/Sq Ft: $${pricePerSqFt ? pricePerSqFt.toFixed(2) : 'N/A'}
+
+🔍 Initial Assessment:
+- Property Age: ${isOldProperty ? 'Older property - may need significant repairs' : 'Newer property - likely lower repair costs'}
+- Price Analysis: ${pricePerSqFt && pricePerSqFt > 200 ? 'Higher price point' : 'Moderate price point'}
+
+🎯 Next Steps: Get ARV estimate and repair costs for offer calculation`,
+          },
+        ],
+      };
+    }
+
+    if (name === 'analyze_seller_finance_deal') {
+      const { 
+        propertyAddress, 
+        purchasePrice, 
+        downPaymentAmount, 
+        interestRate = 0, 
+        amortization = 30, 
+        balloonYears = 10, 
+        monthlyRent,
+        propertyTax = 70,
+        insurance = 50,
+        hoa = 0,
+        other = 0,
+        capexMaintPercent = 20,
+        managementPercent = 20,
+        vacancyPercent = 0,
+        rehabCosts = 0,
+        assignmentFees = 3000
+      } = args;
+
+      // Core calculations
+      const downPayment = downPaymentAmount;
+      const downPaymentPercent = purchasePrice > 0 ? (downPayment / purchasePrice) * 100 : 0;
+      const loanAmount = purchasePrice - downPayment;
+      
+      // Monthly payment calculation (P&I)
+      const monthlyRate = interestRate / 100 / 12;
+      const totalPayments = amortization * 12;
+      
+      let monthlyPI = 0;
+      if (monthlyRate > 0) {
+        monthlyPI = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+                   (Math.pow(1 + monthlyRate, totalPayments) - 1);
+      } else {
+        monthlyPI = loanAmount / totalPayments;
+      }
+      
+      // Balloon balance calculation
+      const balloonPayments = balloonYears * 12;
+      let remainingBalance = 0;
+      
+      if (monthlyRate > 0 && balloonPayments < totalPayments) {
+        remainingBalance = loanAmount * Math.pow(1 + monthlyRate, balloonPayments) - 
+                          monthlyPI * (Math.pow(1 + monthlyRate, balloonPayments) - 1) / monthlyRate;
+      }
+      
+      // Operating expenses calculation
+      const capexMaint = monthlyRent * (capexMaintPercent / 100);
+      const management = monthlyRent * (managementPercent / 100);
+      const vacancy = monthlyRent * (vacancyPercent / 100);
+      
+      const totalMonthlyOperatingExpenses = propertyTax + insurance + hoa + other + capexMaint + management + vacancy;
+      const effectiveRent = monthlyRent - vacancy;
+      const netOperatingIncome = effectiveRent - (propertyTax + insurance + hoa + other + capexMaint + management);
+      const monthlyCashFlow = netOperatingIncome - monthlyPI;
+      const annualCashFlow = monthlyCashFlow * 12;
+      
+      // Buyer Entry Fee calculation
+      const closingCosts = purchasePrice * 0.02; // 2% of purchase price
+      const buyerEntryFee = downPayment + rehabCosts + closingCosts + assignmentFees;
+      const buyerEntryFeePercent = (buyerEntryFee / purchasePrice) * 100;
+      
+      // Cash on Cash Return (using total cash invested)
+      const totalCashInvested = buyerEntryFee;
+      const cashOnCashReturn = totalCashInvested > 0 ? (annualCashFlow / totalCashInvested) * 100 : 0;
+      
+      // Deal qualification criteria
+      const dealCriteria = {
+        buyerEntryMeetsTarget: buyerEntryFeePercent <= 20, // ≤20% buyer entry
+        cashFlowMeetsTarget: monthlyCashFlow >= 200,       // $200+ monthly cash flow
+        cocMeetsTarget: cashOnCashReturn >= 12             // 12%+ cash on cash return
+      };
+      
+      const isQualifiedDeal = dealCriteria.buyerEntryMeetsTarget && dealCriteria.cashFlowMeetsTarget && dealCriteria.cocMeetsTarget;
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `# 🏠 SELLER FINANCE ANALYSIS - ${propertyAddress}
+
+## 📊 DEAL SUMMARY
+- **Purchase Price:** $${purchasePrice.toLocaleString()}
+- **Down Payment:** $${Math.round(downPayment).toLocaleString()} (${downPaymentPercent.toFixed(1)}%)
+- **Loan Amount:** $${Math.round(loanAmount).toLocaleString()}
+- **Interest Rate:** ${interestRate}%
+- **Amortization:** ${amortization} years
+- **Balloon Term:** ${balloonYears} years
+
+## 💰 MONTHLY CASH FLOW BREAKDOWN
+**INCOME:**
+- Gross Monthly Rent: $${monthlyRent.toLocaleString()}
+- Less Vacancy (${vacancyPercent}%): -$${Math.round(vacancy)}
+- **Effective Rent: $${Math.round(effectiveRent).toLocaleString()}**
+
+**OPERATING EXPENSES:**
+- Property Tax: $${propertyTax}
+- Insurance: $${insurance}
+- HOA: $${hoa}
+- Other: $${other}
+- CapEx & Maintenance (${capexMaintPercent}%): $${Math.round(capexMaint)}
+- Management (${managementPercent}%): $${Math.round(management)}
+- **Total Operating Expenses: $${Math.round(totalMonthlyOperatingExpenses).toLocaleString()}**
+
+**NET OPERATING INCOME: $${Math.round(netOperatingIncome).toLocaleString()}**
+
+**DEBT SERVICE:**
+- Principal & Interest: $${Math.round(monthlyPI)}
+
+## 🎯 FINAL RESULTS
+- **Monthly Cash Flow: $${Math.round(monthlyCashFlow).toLocaleString()}**
+- **Annual Cash Flow: $${Math.round(annualCashFlow).toLocaleString()}**
+- **Balloon Balance: $${Math.round(remainingBalance).toLocaleString()}**
+
+## 💵 BUYER ENTRY FEE ANALYSIS
+- Down Payment: $${Math.round(downPayment).toLocaleString()}
+- Rehab Costs: $${rehabCosts.toLocaleString()}
+- Closing Costs (2%): $${Math.round(closingCosts).toLocaleString()}
+- Assignment Fees: $${assignmentFees.toLocaleString()}
+- **TOTAL BUYER ENTRY FEE: $${Math.round(buyerEntryFee).toLocaleString()} (${buyerEntryFeePercent.toFixed(1)}%)**
+
+## 📈 CASH ON CASH RETURN
+- **${cashOnCashReturn.toFixed(1)}%** (Annual Cash Flow ÷ Total Cash Invested)
+
+## 🎯 DEAL QUALIFICATION RESULTS
+
+${dealCriteria.buyerEntryMeetsTarget ? '✅' : '❌'} **BUYER ENTRY ≤20%:** ${buyerEntryFeePercent.toFixed(1)}% ${dealCriteria.buyerEntryMeetsTarget ? '(PASSES)' : '(FAILS)'}
+${dealCriteria.cashFlowMeetsTarget ? '✅' : '❌'} **CASH FLOW ≥$200:** $${Math.round(monthlyCashFlow)} ${dealCriteria.cashFlowMeetsTarget ? '(PASSES)' : '(FAILS)'}
+${dealCriteria.cocMeetsTarget ? '✅' : '❌'} **COC RETURN ≥12%:** ${cashOnCashReturn.toFixed(1)}% ${dealCriteria.cocMeetsTarget ? '(PASSES)' : '(FAILS)'}
+
+## ${isQualifiedDeal ? '🚀 DEAL QUALIFIED - PROCEED!' : '🛑 DEAL NOT QUALIFIED'}
+
+${isQualifiedDeal ? 
+  '**This deal meets all seller finance criteria and is recommended for pursuit.**' : 
+  '**This deal does not meet minimum criteria. Consider negotiating better terms or pass.**'}`
+          },
+        ],
+      };
+    }
+
+    if (name === 'calculate_offer') {
+      const { arv, repairCosts, wholesaleFee = 5000 } = args;
+      
+      // Wholesale calculation: ARV - Repair Costs - Wholesale Fee - Buyer Profit (typically 20-25%)
+      const buyerProfit = arv * 0.22; // 22% buyer profit margin
+      const maxOffer = arv - repairCosts - wholesaleFee - buyerProfit;
+      const conservativeOffer = maxOffer * 0.85; // 85% of max for negotiation room
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🧮 Wholesale Offer Calculation:
+
+💎 ARV (After Repair Value): $${arv.toLocaleString()}
+🔧 Repair Costs: $${repairCosts.toLocaleString()}
+💰 Wholesale Fee: $${wholesaleFee.toLocaleString()}
+📈 Buyer Profit (22%): $${buyerProfit.toLocaleString()}
+
+🎯 RECOMMENDED OFFERS:
+• Conservative Offer: $${conservativeOffer.toLocaleString()} (Safe negotiation room)
+• Maximum Offer: $${maxOffer.toLocaleString()} (Absolute ceiling)
+
+📊 Deal Analysis:
+- Potential Wholesale Profit: $${wholesaleFee.toLocaleString()}
+- Deal Margin: ${((maxOffer / arv) * 100).toFixed(1)}% of ARV
+- Risk Level: ${maxOffer > 0 ? 'VIABLE DEAL ✅' : 'PASS - NO PROFIT MARGIN ❌'}`,
+          },
+        ],
+      };
+    }
+
+    if (name === 'analyze_message_and_respond') {
+      const { messageContent, senderInfo, propertyAddress, messageType, previousContext } = args;
+      
+      // Analyze message content for key indicators
+      const urgencyIndicators = ['asap', 'urgent', 'quick', 'fast', 'need to sell', 'motivated'];
+      const isUrgent = urgencyIndicators.some(indicator => 
+        messageContent.toLowerCase().includes(indicator)
+      );
+      
+      const priceIndicators = messageContent.match(/\$[\d,]+/g) || [];
+      const mentionedPrice = priceIndicators.length > 0 ? priceIndicators[0] : null;
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📨 Message Analysis for ${senderInfo || 'Sender'}:
+
+📝 Message Type: ${messageType.toUpperCase()}
+🏠 Property: ${propertyAddress || 'Not specified'}
+⚡ Urgency Level: ${isUrgent ? 'HIGH - Motivated seller indicators detected' : 'NORMAL'}
+💰 Price Mentioned: ${mentionedPrice || 'None mentioned'}
+
+🔍 Key Message Insights:
+"${messageContent}"
+
+📊 Response Strategy:
+- ${messageType === 'interest' ? 'Express immediate interest and schedule call' : ''}
+- ${messageType === 'question' ? 'Provide detailed answer and build rapport' : ''}
+- ${messageType === 'negotiation' ? 'Analyze offer terms and provide counter' : ''}
+- ${isUrgent ? 'PRIORITY: Respond within 30 minutes' : 'Standard response timeline'}
+
+🎯 Next Action: ${propertyAddress ? 'Run underwriting analysis' : 'Request property details'}`,
+          },
+        ],
+      };
+    }
+
+    if (name === 'underwrite_from_inquiry') {
+      const { propertyAddress, askingPrice, propertyDetails, urgencyLevel } = args;
+      
+      // Quick underwriting logic based on inquiry
+      const estimatedARV = askingPrice ? askingPrice * 1.15 : null; // Rough estimate
+      const estimatedRepairs = askingPrice ? askingPrice * 0.15 : 25000; // 15% or $25k default
+      const quickOffer = estimatedARV ? (estimatedARV - estimatedRepairs) * 0.65 : null;
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `⚡ Quick Underwriting Analysis for ${propertyAddress}:
+
+📍 Property: ${propertyAddress}
+💰 Asking Price: ${askingPrice ? `$${askingPrice.toLocaleString()}` : 'TBD'}
+🔧 Property Details: ${propertyDetails || 'Limited info available'}
+⏰ Urgency: ${urgencyLevel.toUpperCase()}
+
+📊 Quick Assessment:
+- Estimated ARV: ${estimatedARV ? `$${estimatedARV.toLocaleString()}` : 'Needs comparable analysis'}
+- Estimated Repairs: $${estimatedRepairs.toLocaleString()}
+- Quick Offer Range: ${quickOffer ? `$${(quickOffer * 0.9).toLocaleString()} - $${quickOffer.toLocaleString()}` : 'Needs more data'}
+
+🎯 Confidence Level: ${askingPrice ? 'MEDIUM - Based on asking price' : 'LOW - Need more property details'}
+
+⚡ ${urgencyLevel === 'high' ? 'URGENT: Make verbal offer today, full analysis tomorrow' : 'Schedule property walkthrough for detailed analysis'}
+
+🔄 Next Steps: ${!askingPrice ? 'Request asking price and property specs' : 'Schedule property inspection'}`,
+          },
+        ],
+      };
+    }
+
+    if (name === 'generate_seller_response') {
+      const { analysisResult, responseType, sellerPersonality, offerAmount, financingOptions } = args;
+      
+      // Generate personalized response based on seller type and analysis
+      let responseTemplate = '';
+      
+      if (responseType === 'initial_interest') {
+        responseTemplate = `Hi! Thank you for reaching out about your property. I'm a local real estate investor and I'm very interested in learning more about your situation.
+
+${sellerPersonality === 'motivated' ? 'I understand you may need to sell quickly, and I can often close in as little as 10-15 days with cash or flexible financing options.' : ''}
+
+${sellerPersonality === 'analytical' ? 'I\'d love to discuss the numbers with you and show you exactly how I arrived at my offer calculation.' : ''}
+
+${sellerPersonality === 'emotional' ? 'I want to make sure this process is as smooth and stress-free as possible for you.' : ''}
+
+Would you be available for a quick 10-minute call to discuss your property and timeline?
+
+Best regards,
+Collin`;
+      }
+      
+      if (responseType === 'offer_presentation') {
+        responseTemplate = `Based on my analysis of your property, I can make you a strong offer:
+
+${analysisResult}
+
+💰 My Offer: ${offerAmount ? `$${offerAmount.toLocaleString()}` : 'Calculating...'}
+
+${financingOptions ? `💳 Financing Options: ${financingOptions}` : '🏦 Financing: Cash close in 2 weeks OR seller financing available'}
+
+This offer is based on:
+- Current market conditions
+- Property condition assessment  
+- My ability to close quickly
+
+${sellerPersonality === 'business_focused' ? 'I can provide references and proof of funds immediately.' : 'I want to make sure this works well for your situation.'}
+
+When would be a good time to discuss the details?`;
+      }
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📧 Generated Response (${responseType.replace('_', ' ').toUpperCase()}):
+
+${responseTemplate}
+
+🎯 Response Strategy:
+- Tone: ${sellerPersonality === 'emotional' ? 'Empathetic and supportive' : sellerPersonality === 'analytical' ? 'Data-driven and detailed' : 'Professional and direct'}
+- Call-to-Action: ${responseType === 'initial_interest' ? 'Schedule call' : responseType === 'offer_presentation' ? 'Discuss offer details' : 'Continue conversation'}
+- Follow-up: ${responseType === 'initial_interest' ? 'Call within 2 hours if no response' : 'Follow up in 24 hours if no response'}
+
+✅ Ready to send or customize further!`,
+          },
+        ],
+      };
+    }
+
+    if (name === 'process_business_memory') {
+      const { conversationText, sessionTopic, currentContext = 'General business discussion' } = args;
+      
+      const today = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', month: 'long', day: 'numeric' 
+      });
+      
+      const processedMemory = `## 🧠 ${today} - ${sessionTopic}
+
+### What We Accomplished:
+[Business progress and technical milestones from this session]
+
+### Where We Left Off:
+- Current deals in pipeline and status
+- MCP development: what's working/broken  
+- Next immediate actions needed
+- Roadmap progress and gaps
+
+### Decision Log:
+- Choices made and reasoning
+- Deal criteria applied
+- Technical implementation decisions
+
+### Performance Patterns:
+- What keeps Collin moving forward efficiently
+- What causes delays or overwhelm (business impact)
+- Support strategies that maintain momentum
+
+### Key Learnings About Collin:
+- New insights about how he operates best
+- Communication preferences discovered
+- Decision-making patterns observed
+- What motivates vs. drains energy
+
+### Next Session Priorities:
+- [Specific business actions to pick up immediately]
+
+---
+**Session Context:** ${currentContext}
+**Processed:** ${today}`;
+
+      return {
+        content: [{ 
+          type: 'text', 
+          text: `✅ **BUSINESS MEMORY PROCESSED**\n\n${processedMemory}` 
+        }]
+      };
+    }
+
+    if (name === 'save_business_memory') {
+      const { processedMemory, sessionTopic, priority = 'medium' } = args;
+      
+      try {
+        // FIX 3: DIRECTORY CREATION - use absolute paths like search function
+        const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+        const memoriesDir = path.join(scriptDir, 'memories');
+        
+        if (!fs.existsSync(memoriesDir)) {
+          fs.mkdirSync(memoriesDir, { recursive: true });
+        }
+        
+        const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const filename = `${timestamp}-${sessionTopic.replace(/\s+/g, '-').toLowerCase()}.md`;
+        const filepath = path.join(memoriesDir, filename);
+        
+        fs.writeFileSync(filepath, processedMemory);
+        
+        return {
+          content: [{ 
+            type: 'text', 
+            text: `✅ **BUSINESS MEMORY SAVED**\n\n📁 **File:** ${filename}\n🎯 **Priority:** ${priority.toUpperCase()}\n📍 **Location:** ${filepath}\n\n🔍 **Memory is now searchable** using the search_memories tool.` 
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: 'text', 
+            text: `❌ **Error saving memory:** ${error.message}\n\n🔧 **Troubleshooting:** Ensure the memories directory exists and you have write permissions.` 
+          }]
+        };
+      }
+    }
+
+    if (name === 'search_memories') {
+      const { searchTerm, category = 'all', timeframe = 'all', page_size = 10, page_token = '', request_page_token = false } = args;
+      
+      try {
+        const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+        
+        // FIX 1: CATEGORY FILTERING - determine which directories to search
+        let searchDirs = [];
+        if (category === 'running') {
+          searchDirs = [path.join(scriptDir, 'memories')];
+        } else if (category === 'detailed') {
+          searchDirs = [path.join(scriptDir, 'legacy-memories')];
+        } else {
+          // category === 'all' or any other value
+          searchDirs = [
+            path.join(scriptDir, 'memories'), 
+            path.join(scriptDir, 'legacy-memories')
+          ];
+        }
+        
+        let allFiles = [];
+
+        // Collect files from selected directories only
+        for (const dir of searchDirs) {
+          if (fs.existsSync(dir)) {
+            const files = fs.readdirSync(dir)
+              .filter(file => file.endsWith('.md'))
+              .map(file => ({ file, dir }));
+            allFiles = allFiles.concat(files);
+          }
+        }
+
+        if (allFiles.length === 0) {
+          return {
+            content: [{ 
+              type: 'text', 
+              text: `🔍 **MEMORY SEARCH RESULTS**\n\n**Search Term:** "${searchTerm}"\n**Categories:** ${category}\n**Results Found:** 0\n\nNo memory files found in directories.\n\n💡 **Search more specifically or use different terms to find additional memories.**` 
+            }]
+          };
+        }
+        
+        let matchingFiles = [];
+        
+        for (const {file, dir} of allFiles) {
+          try {
+            const fullPath = path.join(dir, file);
+            const content = fs.readFileSync(fullPath, 'utf8');
+            
+            const searchMatch = content.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            if (searchMatch) {
+              const preview = content.substring(0, 200).replace(/\n/g, ' ');
+              matchingFiles.push({ 
+                file, 
+                content: preview, 
+                fullPath: fullPath,
+                source: dir.includes('legacy') ? 'DETAILED' : 'RUNNING'
+              });
+            }
+          } catch (fileError) {
+            // Skip files that can't be read
+            continue;
+          }
+        }
+
+        // FIX 2: PAGINATION CONTROLS - implement result limiting and page tokens
+        const pageTokenValue = page_token ? parseInt(page_token) : 0;
+        const startIndex = pageTokenValue;
+        const endIndex = startIndex + page_size;
+        const paginatedFiles = matchingFiles.slice(startIndex, endIndex);
+        const hasMoreResults = endIndex < matchingFiles.length;
+        const nextPageToken = hasMoreResults ? endIndex.toString() : null;
+
+        const resultsText = paginatedFiles.length > 0 ? 
+          paginatedFiles.map(match => 
+            `**📁 ${match.source}: ${match.file}**\n${match.content}...\n`
+          ).join('\n') :
+          'No memories found matching your search term.';
+
+        let responseText = `🔍 **MEMORY SEARCH RESULTS**\n\n**Search Term:** "${searchTerm}"\n**Categories:** ${category}\n**Results Found:** ${matchingFiles.length} total, showing ${paginatedFiles.length}\n\n${resultsText}`;
+        
+        // Add pagination info if there are more results
+        if (hasMoreResults) {
+          responseText += `\n\n📄 **Page ${Math.floor(startIndex / page_size) + 1}** - Use page_token: "${nextPageToken}" for next page`;
+        }
+        
+        responseText += `\n\n💡 **Search more specifically or use different terms to find additional memories.**`;
+
+        return {
+          content: [{ 
+            type: 'text', 
+            text: responseText
+          }]
+        };
+        
+      } catch (error) {
+        return {
+          content: [{ 
+            type: 'text', 
+            text: `❌ **Search Error:** ${error.message}`
+          }]
+        };
+      }
+    }
+
+    if (name === 'process_legacy_memory') {
+      const { legacyContent, sourceType, originalDate = 'Unknown date' } = args;
+      
+      const today = new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', month: 'long', day: 'numeric' 
+      });
+      
+      const processedLegacy = `## 🗂️ LEGACY MEMORY - ${sourceType.toUpperCase()}
+**Original Date:** ${originalDate}
+**Processed:** ${today}
+
+### Legacy Content:
+${legacyContent}
+
+### Key Insights Extracted:
+- [Important patterns or insights from this legacy content]
+- [Relevant context for current business operations]
+- [Historical decisions that impact current strategy]
+
+### Current Relevance:
+- [How this legacy information applies to current business]
+- [Action items or reminders derived from this content]
+
+---
+**Source Type:** ${sourceType}
+**Migration Status:** Processed and standardized
+**Search Tags:** #legacy #${sourceType} #historical`;
+
+      return {
+        content: [{ 
+          type: 'text', 
+          text: `✅ **LEGACY MEMORY PROCESSED**\n\n📂 **Source Type:** ${sourceType.toUpperCase()}\n📅 **Original Date:** ${originalDate}\n\n${processedLegacy}` 
+        }]
+      };
+    }
+
+    if (name === 'save_legacy_memory') {
+      const { processedLegacy, sourceType, originalDate } = args;
+      
+      try {
+        // FIX 3: DIRECTORY CREATION - use absolute paths like search function
+        const scriptDir = path.dirname(new URL(import.meta.url).pathname);
+        const legacyDir = path.join(scriptDir, 'legacy-memories');
+        
+        if (!fs.existsSync(legacyDir)) {
+          fs.mkdirSync(legacyDir, { recursive: true });
+        }
+        
+        const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        const filename = `${timestamp}-legacy-${sourceType}-${originalDate.replace(/\s+/g, '-').toLowerCase()}.md`;
+        const filepath = path.join(legacyDir, filename);
+        
+        fs.writeFileSync(filepath, processedLegacy);
+        
+        return {
+          content: [{ 
+            type: 'text', 
+            text: `✅ **LEGACY MEMORY SAVED**\n\n📁 **File:** ${filename}\n📂 **Type:** ${sourceType.toUpperCase()}\n📍 **Location:** ${filepath}\n\n🔍 **Memory is now searchable** using the search_memories tool.` 
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{ 
+            type: 'text', 
+            text: `❌ **Error saving legacy memory:** ${error.message}` 
+          }]
+        };
+      }
+    }
+
+    throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+  } catch (error) {
+    throw new McpError(ErrorCode.InternalError, `Tool execution failed: ${error.message}`);
+  }
+});
+
+// Start the server
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+main().catch((error) => {
+  console.error('Server error:', error);
+  process.exit(1);
+});

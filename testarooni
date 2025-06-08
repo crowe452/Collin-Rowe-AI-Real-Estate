@@ -1,0 +1,963 @@
+import React, { useState, useEffect } from 'react';
+
+const InteractiveDealCalculator = () => {
+  // State variables - removed monthlyPaymentToSeller as it's always calculated
+  const [listPrice, setListPrice] = useState(85000);
+  const [offerPrice, setOfferPrice] = useState(85000);
+  const [downPaymentAmount, setDownPaymentAmount] = useState(10000);
+  const [interestRate, setInterestRate] = useState(6.0);
+  const [amortization, setAmortization] = useState(17.3);
+  const [balloonYears, setBalloonYears] = useState(8);
+  const [appreciationPercent, setAppreciationPercent] = useState(4.50);
+  const [monthlyRent, setMonthlyRent] = useState(1250);
+  const [propertyTax, setPropertyTax] = useState(70);
+  const [insurance, setInsurance] = useState(50);
+  const [capexMaintPercent, setCapexMaintPercent] = useState(10.0);
+  const [managementPercent, setManagementPercent] = useState(10.0);
+  const [rehabCosts, setRehabCosts] = useState(2500);
+  const [assignmentFees, setAssignmentFees] = useState(5000);
+  const [agentCommissionRate, setAgentCommissionRate] = useState(3);
+  
+  const [calculations, setCalculations] = useState({});
+
+  useEffect(() => {
+    try {
+      const purchasePrice = offerPrice;
+      const downPayment = downPaymentAmount;
+      const downPaymentPercent = purchasePrice > 0 ? (downPayment / purchasePrice) * 100 : 0;
+      
+      // Calculate the mathematically correct monthly payment based on loan terms
+      const loanAmount = purchasePrice - downPayment;
+      const monthlyRate = interestRate / 100 / 12;
+      const totalPayments = amortization * 12;
+      
+      let calculatedMonthlyPI = 0;
+      if (monthlyRate > 0) {
+        calculatedMonthlyPI = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, totalPayments)) / 
+                             (Math.pow(1 + monthlyRate, totalPayments) - 1);
+      } else {
+        calculatedMonthlyPI = loanAmount / totalPayments;
+      }
+      
+      // Always use the mathematically calculated payment - no overrides
+      const monthlyPI = calculatedMonthlyPI;
+      
+      // Balloon balance calculation
+      const balloonPayments = balloonYears * 12;
+      const monthlyRateCalc = interestRate / 100 / 12;
+      let remainingBalance = 0;
+      let totalInterestPaid = 0;
+      let totalPrincipalPaid = 0;
+      let totalPaymentsMade = 0;
+      
+      if (monthlyRateCalc > 0 && balloonPayments > 0) {
+        totalPaymentsMade = monthlyPI * balloonPayments;
+        const totalPayments = amortization * 12;
+        if (balloonPayments < totalPayments) {
+          remainingBalance = loanAmount * Math.pow(1 + monthlyRateCalc, balloonPayments) - 
+                            monthlyPI * (Math.pow(1 + monthlyRateCalc, balloonPayments) - 1) / monthlyRateCalc;
+        } else {
+          remainingBalance = 0;
+        }
+        totalPrincipalPaid = loanAmount - remainingBalance;
+        totalInterestPaid = totalPaymentsMade - totalPrincipalPaid;
+      } else if (monthlyRateCalc === 0) {
+        totalPaymentsMade = monthlyPI * balloonPayments;
+        totalPrincipalPaid = totalPaymentsMade;
+        totalInterestPaid = 0;
+        remainingBalance = Math.max(0, loanAmount - totalPrincipalPaid);
+      }
+      
+      // Appreciation calculations - CORRECTED: Use offer price as starting point, not list price
+      const appreciationRate = appreciationPercent / 100;
+      const currentMarketValue = offerPrice * 0.90; // Assume we're buying at 110% of market value (90% = market)
+      const appreciatedMarketValue = currentMarketValue * Math.pow(1 + appreciationRate, balloonYears);
+      const appreciationProfit = appreciatedMarketValue - currentMarketValue;
+      const refinanceLTV = remainingBalance / appreciatedMarketValue;
+      const canRefinance = refinanceLTV <= 0.80;
+      const equityAtBalloon = appreciatedMarketValue - remainingBalance;
+      const equityPercent = (equityAtBalloon / appreciatedMarketValue) * 100;
+      
+      // Agent commission calculations - CORRECTED: Based on purchase price, use selected rate
+      const agentCommission = offerPrice * (agentCommissionRate / 100);
+      const sellerCut = offerPrice - agentCommission;
+      
+      // NEW: Seller's immediate cash from down payment (what they actually net at closing)
+      const sellerCashAtClosing = downPayment - agentCommission;
+      const downPaymentCoversCommission = downPayment >= agentCommission;
+      
+      // Assignment fee split (60/40)
+      const ourAssignmentFee = assignmentFees * 0.60;
+      const buyerFinderFee = assignmentFees * 0.40;
+      
+      // Operating expenses - CORRECTED: Include monthly payment to seller
+      const capexMaint = monthlyRent * (capexMaintPercent / 100);
+      const management = monthlyRent * (managementPercent / 100);
+      const totalMonthlyOperatingExpenses = propertyTax + insurance + capexMaint + management + monthlyPI; // Include P&I payment
+      const netOperatingIncome = monthlyRent - totalMonthlyOperatingExpenses;
+      const monthlyCashFlow = netOperatingIncome; // Already includes all expenses including P&I
+      const annualCashFlow = monthlyCashFlow * 12;
+      
+      // Buyer Entry Fee calculation
+      const closingCosts = purchasePrice * 0.02;
+      const buyerEntryFee = downPayment + rehabCosts + closingCosts + assignmentFees;
+      const buyerEntryFeePercent = (buyerEntryFee / purchasePrice) * 100;
+      
+      const totalCashInvested = buyerEntryFee;
+      const adjustedCashOnCash = totalCashInvested > 0 ? (annualCashFlow / totalCashInvested) * 100 : 0;
+
+      // Deal qualification criteria
+      const dealCriteria = {
+        buyerEntryMeetsTarget: buyerEntryFeePercent <= 20,
+        cashFlowMeetsTarget: monthlyCashFlow >= 200,
+        cocMeetsTarget: adjustedCashOnCash >= 12
+      };
+
+      // Seller's net profit calculation - CORRECTED: Subtract agent commission
+      // Seller gets: Down payment + All monthly payments + Balloon balance - Agent commission
+      const sellersNetProfit = downPayment + totalPaymentsMade + remainingBalance - agentCommission;
+
+      setCalculations({
+        purchasePrice,
+        listPrice,
+        downPayment: Math.round(downPayment),
+        downPaymentPercent: Number(downPaymentPercent.toFixed(2)),
+        loanAmount: Math.round(loanAmount),
+        monthlyPI: Math.round(monthlyPI),
+        balloonBalance: Math.round(remainingBalance),
+        
+        // Balloon payment details
+        totalInterestPaid: Math.round(totalInterestPaid),
+        totalPrincipalPaid: Math.round(totalPrincipalPaid),
+        totalPaymentsMade: Math.round(totalPaymentsMade),
+        sellersNetProfit: Math.round(sellersNetProfit),
+        
+        // Appreciation details - CORRECTED calculations
+        currentMarketValue: Math.round(currentMarketValue),
+        appreciatedMarketValue: Math.round(appreciatedMarketValue),
+        appreciationProfit: Math.round(appreciationProfit),
+        refinanceLTV: Number((refinanceLTV * 100).toFixed(1)),
+        canRefinance: canRefinance,
+        equityAtBalloon: Math.round(equityAtBalloon),
+        equityPercent: Number(equityPercent.toFixed(1)),
+        
+        // Agent commissions - Updated to single rate
+        agentCommission: Math.round(agentCommission),
+        sellerCut: Math.round(sellerCut),
+        
+        // NEW: Seller's cash at closing calculations
+        sellerCashAtClosing: Math.round(sellerCashAtClosing),
+        downPaymentCoversCommission: downPaymentCoversCommission,
+        
+        // Assignment fees
+        ourAssignmentFee: Math.round(ourAssignmentFee),
+        buyerFinderFee: Math.round(buyerFinderFee),
+        
+        // Operating expenses
+        propertyTax: Math.round(propertyTax),
+        insurance: Math.round(insurance),
+        capexMaint: Math.round(capexMaint),
+        management: Math.round(management),
+        totalMonthlyOperatingExpenses: Math.round(totalMonthlyOperatingExpenses),
+        
+        netOperatingIncome: Math.round(netOperatingIncome),
+        monthlyCashFlow: Math.round(monthlyCashFlow),
+        annualCashFlow: Math.round(annualCashFlow),
+        adjustedCashOnCash: Number(adjustedCashOnCash.toFixed(2)),
+        
+        rehabCosts: rehabCosts,
+        buyerEntryFee: Math.round(buyerEntryFee),
+        buyerEntryFeePercent: Number(buyerEntryFeePercent.toFixed(2)),
+        totalCashInvested: totalCashInvested,
+        closingCosts: Math.round(closingCosts),
+        assignmentFees: assignmentFees,
+        
+        dealCriteria
+      });
+    } catch (error) {
+      console.error('Calculation error:', error);
+    }
+  }, [listPrice, offerPrice, downPaymentAmount, interestRate, amortization, balloonYears, 
+      appreciationPercent, monthlyRent, propertyTax, insurance, capexMaintPercent, managementPercent, rehabCosts, assignmentFees, agentCommissionRate]);
+
+  const formatCurrency = (amount) => {
+    if (isNaN(amount) || amount === undefined) return '$0';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatCurrencyPrecise = (amount) => {
+    if (isNaN(amount) || amount === undefined) return '$0.00';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  const formatPercent = (percent) => {
+    if (isNaN(percent) || percent === undefined) return '0.00%';
+    return `${percent.toFixed(2)}%`;
+  };
+
+  return (
+    <div className="w-full max-w-7xl mx-auto p-4 bg-blue-900 text-white min-h-screen">
+      {/* STICKY HEADER - Always Visible Deal Status + Seller Cash */}
+      <div className="sticky top-0 z-50 mb-6 bg-blue-900 pb-4 border-b-4 border-blue-700">
+        {/* Deal Qualification Status */}
+        <div className={`p-4 rounded-lg border-4 mb-3 transition-all duration-300 ${
+          calculations.dealCriteria?.buyerEntryMeetsTarget && calculations.dealCriteria?.cashFlowMeetsTarget && calculations.dealCriteria?.cocMeetsTarget
+            ? 'bg-green-600 border-green-400 shadow-lg shadow-green-500/50' 
+            : 'bg-red-600 border-red-400 shadow-lg shadow-red-500/50'
+        }`}>
+          <div className="text-center">
+            <div className="text-2xl font-bold animate-pulse mb-2">
+              {calculations.dealCriteria?.buyerEntryMeetsTarget && calculations.dealCriteria?.cashFlowMeetsTarget && calculations.dealCriteria?.cocMeetsTarget
+                ? '🚀 DEAL QUALIFIES!' 
+                : '🛑 DEAL NEEDS WORK'}
+            </div>
+            
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div className={`p-2 rounded transition-all duration-300 ${calculations.dealCriteria?.buyerEntryMeetsTarget ? 'bg-green-700' : 'bg-red-700'}`}>
+                <div className="text-xs">≤20% BUYER ENTRY</div>
+                <div className="font-bold">{formatPercent(calculations.buyerEntryFeePercent)}</div>
+                <div className="text-xs">{calculations.dealCriteria?.buyerEntryMeetsTarget ? '✅' : '❌'}</div>
+              </div>
+              
+              <div className={`p-2 rounded transition-all duration-300 ${calculations.dealCriteria?.cashFlowMeetsTarget ? 'bg-green-700' : 'bg-red-700'}`}>
+                <div className="text-xs">CASHFLOW $200+</div>
+                <div className="font-bold">{formatCurrency(calculations.monthlyCashFlow)}</div>
+                <div className="text-xs">{calculations.dealCriteria?.cashFlowMeetsTarget ? '✅' : '❌'}</div>
+              </div>
+              
+              <div className={`p-2 rounded transition-all duration-300 ${calculations.dealCriteria?.cocMeetsTarget ? 'bg-green-700' : 'bg-red-700'}`}>
+                <div className="text-xs">12% C.O.C MINIMUM</div>
+                <div className="font-bold">{formatPercent(calculations.adjustedCashOnCash)}</div>
+                <div className="text-xs">{calculations.dealCriteria?.cocMeetsTarget ? '✅' : '❌'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Seller's Cash at Closing */}
+        <div className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+          calculations.downPaymentCoversCommission 
+            ? 'bg-green-700 border-green-500' 
+            : 'bg-red-700 border-red-500'
+        }`}>
+          <div className="text-center">
+            <div className="text-lg font-bold mb-2">
+              💰 SELLER'S CASH AT CLOSING ({agentCommissionRate}% commission)
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="bg-blue-600 p-2 rounded">
+                <div className="text-xs text-blue-200">DOWN PAYMENT</div>
+                <div className="font-bold text-lg">{formatCurrency(downPaymentAmount)}</div>
+              </div>
+              
+              <div className="bg-red-600 p-2 rounded">
+                <div className="text-xs text-red-200">AGENT COMMISSION</div>
+                <div className="font-bold text-lg">-{formatCurrency(calculations.agentCommission)}</div>
+              </div>
+              
+              <div className={`p-2 rounded ${calculations.downPaymentCoversCommission ? 'bg-green-600' : 'bg-red-800'}`}>
+                <div className="text-xs">SELLER NETS</div>
+                <div className="font-bold text-xl">{formatCurrency(calculations.sellerCashAtClosing)}</div>
+                <div className="text-xs mt-1">
+                  {calculations.downPaymentCoversCommission ? '✅ Covers commission' : '❌ SHORT ON COMMISSION!'}
+                </div>
+              </div>
+            </div>
+            
+            {!calculations.downPaymentCoversCommission && (
+              <div className="mt-2 p-2 bg-red-800 rounded text-sm font-bold animate-pulse">
+                ⚠️ SELLER WOULD OWE {formatCurrency(Math.abs(calculations.sellerCashAtClosing))} AT CLOSING!
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Header */}
+      <div className="text-center mb-6 bg-blue-800 p-4 rounded-lg">
+        <h1 className="text-3xl font-bold text-yellow-300 mb-2">🔥 INTERACTIVE DEAL CALCULATOR</h1>
+        <p className="text-lg text-blue-200">Real-Time Seller Finance Analysis Tool</p>
+        <p className="text-sm text-green-300 mt-2">✨ Adjust any field and watch everything update instantly!</p>
+      </div>
+
+      {/* Two Column Layout: Seller Offer + Buyer Entry Fee */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        
+        {/* SELLER FINANCE - SFH OFFER SUMMARY */}
+        <div className="bg-blue-800 p-6 rounded-lg border-2 border-blue-600 hover:border-blue-400 transition-colors">
+          <h3 className="text-xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            🤝 SELLER FINANCE OFFER SUMMARY
+          </h3>
+          
+          <div className="space-y-3">
+            <div className="flex justify-between items-center bg-green-700 p-2 rounded">
+              <span className="text-green-200 font-bold">SELLER'S TOTAL BENEFIT:</span>
+              <span className="font-bold text-white text-lg">{formatCurrency(calculations.sellersNetProfit)}</span>
+            </div>
+            <div className="flex justify-between items-center bg-yellow-600 p-2 rounded">
+              <span className="text-yellow-100 font-bold">SELLER FINANCE OFFER:</span>
+              <span className="font-bold text-black text-lg">{formatCurrency(offerPrice)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-blue-200">DOWN PAYMENT:</span>
+              <span className="font-bold text-white">{formatCurrency(downPaymentAmount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-blue-200">MONTHLY PAYMENT:</span>
+              <span className="font-bold text-white">{formatCurrency(calculations.monthlyPI)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-blue-200">BALLOON:</span>
+              <span className="font-bold text-white">{balloonYears} YEARS</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* BUYER ENTRY FEE BREAKDOWN */}
+        <div className="bg-purple-800 p-6 rounded-lg border-2 border-purple-600 hover:border-purple-400 transition-colors">
+          <h3 className="text-xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            💰 BUYER ENTRY FEE ON SELLER FINANCE
+          </h3>
+          
+          <div className="text-center mb-4">
+            <div className="text-3xl font-bold text-yellow-300">{formatCurrency(calculations.buyerEntryFee)}</div>
+            <div className="text-xl font-bold text-purple-200">{formatPercent(calculations.buyerEntryFeePercent)}</div>
+            <div className="text-sm text-purple-300 mt-1">Target: ≤20% for qualification</div>
+          </div>
+          
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span>DOWN PAYMENT:</span>
+              <span className="font-bold">{formatCurrency(calculations.downPayment)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>REHAB:</span>
+              <span className="font-bold">{formatCurrency(rehabCosts)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>CLOSING (2%):</span>
+              <span className="font-bold">{formatCurrency(calculations.closingCosts)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>ASSIGNMENT FEES:</span>
+              <span className="font-bold">{formatCurrency(assignmentFees)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Second Row: Cashflow & Rental Revenue */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        
+        {/* CASHFLOW */}
+        <div className="bg-green-800 p-6 rounded-lg border-2 border-green-600 hover:border-green-400 transition-colors">
+          <h3 className="text-2xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            💸 CASHFLOW ANALYSIS
+          </h3>
+          
+          <div className="grid grid-cols-2 gap-6 mb-4">
+            <div className="text-center bg-green-700 p-4 rounded-lg">
+              <div className="text-sm text-green-200 mb-1">ANNUAL</div>
+              <div className="text-2xl font-bold text-white">{formatCurrency(calculations.annualCashFlow)}</div>
+            </div>
+            <div className="text-center bg-green-700 p-4 rounded-lg">
+              <div className="text-sm text-green-200 mb-1">MONTHLY</div>
+              <div className="text-2xl font-bold text-white">{formatCurrency(calculations.monthlyCashFlow)}</div>
+            </div>
+          </div>
+          
+          <div className="text-center bg-yellow-600 text-black p-4 rounded-lg">
+            <div className="text-sm font-bold mb-1">CASH-ON-CASH RETURN</div>
+            <div className="text-3xl font-bold">{formatPercent(calculations.adjustedCashOnCash)}</div>
+          </div>
+        </div>
+
+        {/* RENTAL REVENUE vs OPERATING EXPENSES */}
+        <div className="bg-blue-800 p-6 rounded-lg border-2 border-blue-600 hover:border-blue-400 transition-colors">
+          <h3 className="text-2xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            🏠 RENTAL REVENUE BREAKDOWN
+          </h3>
+          
+          <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+            <div>
+              <div className="bg-green-700 p-3 rounded mb-2">
+                <div className="text-green-200 font-bold">RENTAL REVENUE</div>
+                <div className="font-bold text-white text-lg">{formatCurrency(monthlyRent)}</div>
+              </div>
+            </div>
+            <div>
+              <div className="bg-red-700 p-3 rounded mb-2">
+                <div className="text-red-200 font-bold">OPERATING EXPENSES</div>
+                <div className="font-bold text-white text-lg">{formatCurrency(calculations.totalMonthlyOperatingExpenses)}</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-1 text-xs bg-blue-700 p-3 rounded">
+            <div className="flex justify-between">
+              <span>PRINCIPAL & INTEREST:</span>
+              <span className="font-bold">{formatCurrency(calculations.monthlyPI)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>PROPERTY TAX:</span>
+              <span className="font-bold">{formatCurrency(propertyTax)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>INSURANCE:</span>
+              <span className="font-bold">{formatCurrency(insurance)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>CAPEX & MAINT.:</span>
+              <span className="font-bold">{formatCurrency(calculations.capexMaint)} ({capexMaintPercent}%)</span>
+            </div>
+            <div className="flex justify-between">
+              <span>MANAGEMENT:</span>
+              <span className="font-bold">{formatCurrency(calculations.management)} ({managementPercent}%)</span>
+            </div>
+            <div className="flex justify-between border-t border-blue-500 pt-1 mt-2">
+              <span className="font-bold">TOTAL EXPENSES:</span>
+              <span className="font-bold text-red-300">{formatCurrency(calculations.totalMonthlyOperatingExpenses)}</span>
+            </div>
+            <div className="flex justify-between border-t border-blue-500 pt-1 mt-2">
+              <span className="font-bold">NET CASH FLOW:</span>
+              <span className={`font-bold ${calculations.monthlyCashFlow > 0 ? 'text-green-300' : 'text-red-300'}`}>
+                {formatCurrency(calculations.monthlyCashFlow)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Third Row: All Editable Fields + Amortization Calculator */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        
+        {/* EDITABLE FIELDS */}
+        <div className="lg:col-span-2 bg-gray-800 p-6 rounded-lg border-2 border-gray-600 hover:border-gray-400 transition-colors">
+          <h3 className="text-2xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            📝 EDITABLE FIELDS - LIVE CALCULATOR
+          </h3>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">List Price</label>
+              <input
+                type="number"
+                value={listPrice}
+                onChange={(e) => setListPrice(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Offer Price</label>
+              <input
+                type="number"
+                value={offerPrice}
+                onChange={(e) => setOfferPrice(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Down Payment</label>
+              <input
+                type="number"
+                value={downPaymentAmount}
+                onChange={(e) => setDownPaymentAmount(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+              <div className="text-xs text-gray-400 mt-1">
+                {calculations.downPaymentPercent ? `${calculations.downPaymentPercent}% of offer` : ''}
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Interest Rate %</label>
+              <input
+                type="number"
+                step="0.1"
+                value={interestRate}
+                onChange={(e) => setInterestRate(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-blue-700 p-3 rounded border-2 border-blue-400 hover:border-blue-300 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-blue-200">Amortization Years</label>
+              <input
+                type="number"
+                step="0.1"
+                value={amortization}
+                onChange={(e) => setAmortization(Number(e.target.value) || 30)}
+                className="w-full p-2 rounded bg-blue-900 border border-blue-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-blue-700 p-3 rounded border-2 border-blue-400">
+              <label className="block text-xs font-bold mb-1 text-blue-200">Monthly Payment</label>
+              <div className="w-full p-2 rounded bg-blue-900 border-2 border-gray-500 text-gray-300 text-sm font-bold">
+                {formatCurrency(calculations.monthlyPI || 0)}
+              </div>
+              <div className="text-xs text-blue-200 mt-1">
+                Auto-calculated
+              </div>
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Balloon Term Years</label>
+              <input
+                type="number"
+                value={balloonYears}
+                onChange={(e) => setBalloonYears(Number(e.target.value) || 10)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Monthly Rent</label>
+              <input
+                type="number"
+                value={monthlyRent}
+                onChange={(e) => setMonthlyRent(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Property Tax</label>
+              <input
+                type="number"
+                value={propertyTax}
+                onChange={(e) => setPropertyTax(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Insurance</label>
+              <input
+                type="number"
+                value={insurance}
+                onChange={(e) => setInsurance(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">CapEx %</label>
+              <input
+                type="number"
+                step="0.5"
+                value={capexMaintPercent}
+                onChange={(e) => setCapexMaintPercent(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Management %</label>
+              <input
+                type="number"
+                step="0.5"
+                value={managementPercent}
+                onChange={(e) => setManagementPercent(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Rehab Cost</label>
+              <input
+                type="number"
+                value={rehabCosts}
+                onChange={(e) => setRehabCosts(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Assignment Fee</label>
+              <input
+                type="number"
+                value={assignmentFees}
+                onChange={(e) => setAssignmentFees(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-gray-700 p-3 rounded hover:bg-gray-600 transition-colors">
+              <label className="block text-xs font-bold mb-1 text-gray-300">Agent Commission %</label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="15"
+                value={agentCommissionRate}
+                onChange={(e) => setAgentCommissionRate(Number(e.target.value) || 0)}
+                className="w-full p-2 rounded bg-gray-900 border border-gray-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+              <div className="text-xs text-gray-400 mt-1">
+                0% to 15% range
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="mt-6 bg-gray-700 p-4 rounded-lg">
+            <h4 className="text-lg font-bold mb-3 text-yellow-300 text-center">⚡ QUICK DEAL PRESETS</h4>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              <button 
+                onClick={() => {
+                  setListPrice(85000);
+                  setOfferPrice(85000);
+                  setDownPaymentAmount(10000);
+                  setInterestRate(6.0);
+                  setAmortization(17.3);
+                  setMonthlyRent(1250);
+                  setRehabCosts(2500);
+                  setAssignmentFees(5000);
+                }}
+                className="bg-green-600 hover:bg-green-500 text-white px-3 py-2 rounded font-bold transition-colors text-sm"
+              >
+                🔥 Current Deal
+              </button>
+              <button 
+                onClick={() => {
+                  setListPrice(125000);
+                  setOfferPrice(125000);
+                  setDownPaymentAmount(6250);
+                  setInterestRate(5.5);
+                  setAmortization(30);
+                  setMonthlyRent(1450);
+                  setRehabCosts(5000);
+                  setAssignmentFees(4000);
+                }}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded font-bold transition-colors text-sm"
+              >
+                💰 Sample Deal
+              </button>
+              <button 
+                onClick={() => {
+                  setDownPaymentAmount(offerPrice * 0.05);
+                  // Don't change interest rate or amortization automatically
+                }}
+                className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-2 rounded font-bold transition-colors text-sm"
+              >
+                🎯 Low Entry
+              </button>
+              <button 
+                onClick={() => {
+                  setInterestRate(0);
+                  setAmortization(20);
+                  // Only change what the button specifically says it will change
+                }}
+                className="bg-orange-600 hover:bg-orange-500 text-white px-3 py-2 rounded font-bold transition-colors text-sm"
+              >
+                🚀 Zero Interest
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* AMORTIZATION CALCULATOR TOOL */}
+        <div className="bg-blue-800 p-6 rounded-lg border-2 border-blue-600 hover:border-blue-400 transition-colors">
+          <h3 className="text-xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            🧮 AMORTIZATION CALCULATOR
+          </h3>
+          <p className="text-sm text-blue-200 mb-4 text-center">Find the right amortization for clean monthly payments</p>
+          
+          <div className="space-y-4">
+            
+            {/* Current Loan Details */}
+            <div className="bg-blue-700 p-3 rounded">
+              <div className="text-sm text-blue-200 mb-2">CURRENT LOAN DETAILS:</div>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span>Loan Amount:</span>
+                  <span className="font-bold">{formatCurrency(calculations.loanAmount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Interest Rate:</span>
+                  <span className="font-bold">{interestRate}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Auto-calculated from current settings */}
+            <div className="bg-blue-900 p-4 rounded border-2 border-yellow-300">
+              <div className="text-center">
+                <div className="text-sm text-yellow-300 font-bold mb-1">CURRENT CALCULATION</div>
+                <div className="text-lg font-bold text-white">{formatCurrency(calculations.monthlyPI)}/month</div>
+                <div className="text-lg font-bold text-yellow-300">{amortization} years</div>
+                <div className="text-xs text-blue-200 mt-1">Based on loan terms</div>
+              </div>
+            </div>
+
+            {/* Quick Payment Options */}
+            <div className="space-y-2">
+              <div className="text-sm text-blue-200 font-bold">ROUND PAYMENT OPTIONS:</div>
+              
+              {(() => {
+                const currentPayment = calculations.monthlyPI || 0;
+                const loanAmt = calculations.loanAmount || (offerPrice - downPaymentAmount);
+                const rate = interestRate / 100 / 12;
+                
+                // Generate round payment options around current payment
+                const generateRoundPayments = (current) => {
+                  const baseIncrement = 50;
+                  const roundPayments = [];
+                  
+                  // Find the nearest round number below current
+                  const nearestBelow = Math.floor(current / baseIncrement) * baseIncrement;
+                  
+                  // Generate options: 2 below, current area, 2 above
+                  for (let i = -2; i <= 2; i++) {
+                    const payment = nearestBelow + (i * baseIncrement);
+                    if (payment > 0) {
+                      roundPayments.push(payment);
+                    }
+                  }
+                  
+                  return roundPayments;
+                };
+                
+                // Calculate amortization for a given payment
+                const calculateAmortization = (payment, loan, monthlyRate) => {
+                  if (monthlyRate === 0) return loan / payment / 12;
+                  if (payment <= loan * monthlyRate) return 999; // Payment too low
+                  
+                  const ratio = (loan * monthlyRate) / payment;
+                  if (ratio >= 1) return 999; // Payment too low
+                  
+                  const numerator = -Math.log(1 - ratio);
+                  const denominator = Math.log(1 + monthlyRate);
+                  return numerator / denominator / 12; // Convert months to years
+                };
+                
+                const roundPayments = generateRoundPayments(currentPayment);
+                
+                return (
+                  <div className="space-y-1">
+                    {roundPayments.map(payment => {
+                      const amortYears = calculateAmortization(payment, loanAmt, rate);
+                      const isCurrent = Math.abs(payment - currentPayment) < 25; // Within $25
+                      const isReasonable = amortYears > 0 && amortYears < 50;
+                      
+                      return (
+                        <div 
+                          key={payment}
+                          className={`p-2 rounded text-xs cursor-pointer transition-colors ${
+                            isCurrent ? 'bg-yellow-600 hover:bg-yellow-500' : 
+                            isReasonable ? 'bg-blue-700 hover:bg-blue-600' : 'bg-gray-600 cursor-not-allowed'
+                          }`}
+                          onClick={() => {
+                            if (isReasonable) {
+                              // Update amortization to match this payment option
+                              setAmortization(Math.round(amortYears * 10) / 10);
+                            }
+                          }}
+                        >
+                          <div className="flex justify-between">
+                            <span className="font-bold">{formatCurrency(payment)}/month</span>
+                            <span>{isReasonable ? `${amortYears.toFixed(1)} years` : 'N/A'}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="text-xs text-blue-300 text-center">
+              💡 Click any option above to apply it instantly
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Row: Detailed Analysis */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        
+        {/* BALLOON BALANCE DETAILS */}
+        <div className="bg-purple-800 p-6 rounded-lg border-2 border-purple-600 hover:border-purple-400 transition-colors">
+          <h3 className="text-xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            🎈 BALLOON BALANCE DETAILS
+          </h3>
+          
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-purple-200">AT END OF YEAR {balloonYears}:</span>
+            </div>
+            <div className="flex justify-between">
+              <span>DOWN PAYMENT:</span>
+              <span className="font-bold text-green-300">{formatCurrencyPrecise(calculations.downPayment)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>INTEREST PAID:</span>
+              <span className="font-bold text-red-300">{formatCurrencyPrecise(calculations.totalInterestPaid)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>PRINCIPAL PAID:</span>
+              <span className="font-bold text-green-300">{formatCurrencyPrecise(calculations.totalPrincipalPaid)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>OUTSTANDING BALANCE:</span>
+              <span className="font-bold text-yellow-300">{formatCurrencyPrecise(calculations.balloonBalance)}</span>
+            </div>
+            <div className="flex justify-between border-t border-purple-400 pt-2">
+              <span className="font-bold">TOTAL PAID BY BUYER:</span>
+              <span className="font-bold text-white text-lg">{formatCurrencyPrecise(calculations.totalPaymentsMade + calculations.downPayment + calculations.balloonBalance)}</span>
+            </div>
+            <div className="bg-purple-700 p-2 rounded mt-3">
+              <div className="text-center">
+                <div className="text-xs text-purple-200">SELLER'S TOTAL BENEFIT</div>
+                <div className="font-bold text-lg">{formatCurrency(calculations.sellersNetProfit)}</div>
+                <div className="text-xs text-purple-200">Down + Payments + Balloon</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ESTIMATED AGENT COMMISSIONS */}
+        <div className="bg-green-800 p-6 rounded-lg border-2 border-green-600 hover:border-green-400 transition-colors">
+          <h3 className="text-xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            🤝 ESTIMATED AGENT COMMISSIONS
+          </h3>
+          
+          <div className="space-y-4">
+            <div className="bg-green-700 p-3 rounded">
+              <div className="text-center">
+                <div className="text-xs text-green-200 font-bold mb-1">CURRENT COMMISSION RATE</div>
+                <div className="text-xl font-bold text-white">{agentCommissionRate}%</div>
+                <div className="text-xs text-green-200 mt-1">Edit in main fields above</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 text-xs text-center">
+              <div className="font-bold text-green-200">SELLER'S CUT</div>
+              <div className="font-bold text-green-200">AGENT'S CUT</div>
+            </div>
+            
+            <div className="bg-green-700 p-3 rounded hover:bg-green-600 transition-colors">
+              <div className="grid grid-cols-2 gap-2 text-sm text-center">
+                <div className="font-bold text-white">{formatCurrency(calculations.sellerCut)}</div>
+                <div className="font-bold text-white">{formatCurrency(calculations.agentCommission)}</div>
+              </div>
+            </div>
+
+            <div className="text-xs text-green-200 text-center mt-3 bg-green-700 p-2 rounded">
+              {agentCommissionRate}% of offer price: {formatCurrency(offerPrice)}
+            </div>
+          </div>
+        </div>
+
+        {/* APPRECIATION CALCULATOR */}
+        <div className="bg-orange-800 p-6 rounded-lg border-2 border-orange-600 hover:border-orange-400 transition-colors">
+          <h3 className="text-xl font-bold mb-4 text-yellow-300 text-center border-b border-yellow-300 pb-2">
+            📈 APPRECIATION CALCULATOR
+          </h3>
+          
+          <div className="space-y-3 text-sm">
+            <div className="bg-orange-700 p-3 rounded">
+              <label className="block text-xs font-bold mb-1 text-orange-200">Appreciation % Per Year</label>
+              <input
+                type="number"
+                step="0.1"
+                value={appreciationPercent}
+                onChange={(e) => setAppreciationPercent(Number(e.target.value) || 3.0)}
+                className="w-full p-2 rounded bg-orange-900 border border-orange-500 text-white text-sm font-bold focus:border-yellow-300 transition-colors"
+              />
+            </div>
+            
+            <div className="bg-orange-800 p-3 rounded border border-orange-600">
+              <div className="text-center mb-2">
+                <div className="text-xs text-orange-200 font-bold">REFINANCE ANALYSIS</div>
+                <div className="text-sm text-orange-100">Assumes you're buying at 110% of market value</div>
+              </div>
+              
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span>Current Market Value (90%):</span>
+                  <span className="font-bold">{formatCurrency(calculations.currentMarketValue)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Your Purchase Price:</span>
+                  <span className="font-bold">{formatCurrency(offerPrice)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Years of Appreciation:</span>
+                  <span className="font-bold">{balloonYears}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Future Market Value:</span>
+                  <span className="font-bold">{formatCurrency(calculations.appreciatedMarketValue)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Remaining Loan Balance:</span>
+                  <span className="font-bold">{formatCurrencyPrecise(calculations.balloonBalance)}</span>
+                </div>
+                <div className="flex justify-between border-t border-orange-400 pt-1">
+                  <span>Your Equity:</span>
+                  <span className="font-bold text-green-300">{formatCurrency(calculations.equityAtBalloon)} ({calculations.equityPercent}%)</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-4 text-center">
+              <div className={`p-3 rounded transition-colors ${calculations.canRefinance ? 'bg-green-700 hover:bg-green-600' : 'bg-red-700'}`}>
+                <div className="text-xs font-bold">CAN REFINANCE AT 80% LTV?</div>
+                <div className="font-bold text-lg">{calculations.canRefinance ? '✅ YES' : '❌ NO'}</div>
+                <div className="text-xs">
+                  {calculations.canRefinance 
+                    ? `Loan-to-Value: ${calculations.refinanceLTV}% (Below 80% ✓)` 
+                    : `Loan-to-Value: ${calculations.refinanceLTV}% (Above 80% ✗)`
+                  }
+                </div>
+                <div className="text-xs mt-1 opacity-75">
+                  {calculations.canRefinance 
+                    ? 'You have enough equity to refinance!' 
+                    : 'Need more appreciation or lower loan balance'
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Assignment Fee Split */}
+      <div className="bg-yellow-600 text-black p-6 rounded-lg hover:bg-yellow-500 transition-colors">
+        <h3 className="text-lg font-bold mb-3 text-center">💼 ASSIGNMENT FEE BREAKDOWN (60/40 Split)</h3>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="bg-yellow-700 p-3 rounded">
+            <div className="font-bold">TOTAL ASSIGNMENT</div>
+            <div className="text-xl text-white">{formatCurrency(assignmentFees)}</div>
+          </div>
+          <div className="bg-green-600 p-3 rounded">
+            <div className="font-bold text-white">OUR SHARE (60%)</div>
+            <div className="text-xl text-white">{formatCurrency(calculations.ourAssignmentFee)}</div>
+          </div>
+          <div className="bg-blue-600 p-3 rounded">
+            <div className="font-bold text-white">BUYER FINDER (40%)</div>
+            <div className="text-xl text-white">{formatCurrency(calculations.buyerFinderFee)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default InteractiveDealCalculator;
